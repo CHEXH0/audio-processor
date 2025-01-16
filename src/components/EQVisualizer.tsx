@@ -1,5 +1,9 @@
 import React from 'react';
 import { SlidersHorizontal } from 'lucide-react';
+import EQGrid from './eq/EQGrid';
+import FrequencyBands from './eq/FrequencyBands';
+import EQCurve from './eq/EQCurve';
+import EQControlPoints from './eq/EQControlPoints';
 
 interface EQVisualizerProps {
   parameters: {
@@ -11,56 +15,8 @@ interface EQVisualizerProps {
 }
 
 const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
-  // Make the dimensions responsive to viewport
-  const width = 600; // Increased base width
-  const height = 300; // Increased base height
-
-  const getPointPosition = (index: number, value: number) => {
-    const x = (width / 3) * index;
-    const y = height / 2 - (value * height) / 24;
-    return { x, y };
-  };
-
-  const generatePath = () => {
-    const points = Object.values(parameters);
-    let path = `M 0 ${height / 2}`;
-
-    points.forEach((value, index) => {
-      const { x, y } = getPointPosition(index, value);
-      path += ` L ${x} ${y}`;
-    });
-
-    path += ` L ${width} ${height / 2}`;
-    return path;
-  };
-
-  // Calculate frequency response for visualization
-  const getFrequencyResponse = () => {
-    const frequencies = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
-    return frequencies.map(freq => {
-      let response = 0;
-      
-      if (freq < 320) {
-        response += parameters.low;
-      }
-      
-      if (freq > 250 && freq < 2000) {
-        const factor = 1 - Math.abs(Math.log10(freq/1000)) / 2;
-        response += parameters.lowMid * factor;
-      }
-      
-      if (freq > 1000 && freq < 8000) {
-        const factor = 1 - Math.abs(Math.log10(freq/3200)) / 2;
-        response += parameters.highMid * factor;
-      }
-      
-      if (freq > 4000) {
-        response += parameters.high;
-      }
-      
-      return response;
-    });
-  };
+  const width = 600;
+  const height = 300;
 
   return (
     <div className="space-y-4">
@@ -77,114 +33,10 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
           preserveAspectRatio="xMidYMid meet"
           className="p-4"
         >
-          {/* Grid lines with improved visibility */}
-          {[-12, -6, 0, 6, 12].map((db) => {
-            const y = height / 2 - (db * height) / 24;
-            return (
-              <React.Fragment key={db}>
-                <line
-                  x1="0"
-                  y1={y}
-                  x2={width}
-                  y2={y}
-                  stroke="currentColor"
-                  strokeOpacity={0.15}
-                  strokeWidth="1"
-                  strokeDasharray="4 4"
-                  className="transition-opacity duration-200"
-                />
-                <text
-                  x="24"
-                  y={y}
-                  fill="currentColor"
-                  fontSize="12"
-                  alignmentBaseline="middle"
-                  className="transition-opacity duration-200 opacity-70 font-medium"
-                >
-                  {db > 0 ? `+${db}` : db} dB
-                </text>
-              </React.Fragment>
-            );
-          })}
-
-          {/* Frequency bands with improved labels */}
-          {[
-            { freq: '20Hz', label: 'Low' },
-            { freq: '200Hz', label: 'Low Mid' },
-            { freq: '2kHz', label: 'High Mid' },
-            { freq: '20kHz', label: 'High' }
-          ].map(({ freq, label }, index) => {
-            const x = (width / 3) * index;
-            return (
-              <g key={freq}>
-                <text
-                  x={x}
-                  y={height - 16}
-                  fill="currentColor"
-                  fontSize="12"
-                  textAnchor="middle"
-                  className="transition-opacity duration-200 opacity-70 font-medium"
-                >
-                  {freq}
-                </text>
-                <text
-                  x={x}
-                  y={height - 32}
-                  fill="currentColor"
-                  fontSize="10"
-                  textAnchor="middle"
-                  className="transition-opacity duration-200 opacity-50"
-                >
-                  {label}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Enhanced frequency response curve */}
-          <defs>
-            <linearGradient id="curve-gradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="currentColor" stopOpacity="0.5" />
-              <stop offset="100%" stopColor="currentColor" stopOpacity="0.1" />
-            </linearGradient>
-          </defs>
-          <path
-            d={generatePath()}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            className="transition-all duration-200"
-          />
-          <path
-            d={`${generatePath()} V ${height} H 0 Z`}
-            fill="url(#curve-gradient)"
-            className="transition-all duration-200"
-          />
-
-          {/* Enhanced control points */}
-          {Object.entries(parameters).map(([band, value], index) => {
-            const { x, y } = getPointPosition(index, value);
-            return (
-              <g key={band} className="group">
-                <circle
-                  cx={x}
-                  cy={y}
-                  r="6"
-                  className="fill-primary stroke-background stroke-2 transition-all duration-200 cursor-pointer hover:r-8"
-                />
-                <text
-                  x={x}
-                  y={y - 16}
-                  fill="currentColor"
-                  fontSize="12"
-                  textAnchor="middle"
-                  className="opacity-0 transition-opacity duration-200 group-hover:opacity-100 font-medium"
-                >
-                  {value.toFixed(1)} dB
-                </text>
-              </g>
-            );
-          })}
+          <EQGrid width={width} height={height} />
+          <FrequencyBands width={width} height={height} />
+          <EQCurve width={width} height={height} parameters={parameters} />
+          <EQControlPoints width={width} height={height} parameters={parameters} />
         </svg>
       </div>
     </div>

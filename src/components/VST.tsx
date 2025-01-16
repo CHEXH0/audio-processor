@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
-import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import EQVisualizer from './EQVisualizer';
 import TransportControls from './audio/TransportControls';
@@ -153,27 +152,7 @@ const VST = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
-            <h2 className="text-xl font-medium">Equalizer</h2>
             <EQVisualizer parameters={eqParams} />
-            
-            <div className="grid grid-cols-2 gap-6">
-              {Object.entries(eqParams).map(([band, value]) => (
-                <div key={band} className="space-y-2">
-                  <label className="parameter-label">
-                    {band.replace(/([A-Z])/g, ' $1').trim()}
-                  </label>
-                  <Slider
-                    value={[value]}
-                    min={-12}
-                    max={12}
-                    step={0.1}
-                    className="parameter-change"
-                    onValueChange={([v]) => handleEQChange(band as keyof typeof eqParams, v)}
-                  />
-                  <span className="parameter-value">{value.toFixed(1)} dB</span>
-                </div>
-              ))}
-            </div>
           </div>
 
           <CompressorControls
