@@ -37,22 +37,26 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const [processedData, setProcessedData] = useState<Float32Array | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const originalDestination = useRef<AudioNode | null>(null);
 
   const startRecording = async () => {
     try {
-      if (!audioContext.current) return;
+      if (!audioContext.current || !nodes.compressor) return;
+      
+      // Store the original destination connection
+      originalDestination.current = nodes.compressor.destination;
       
       // Create a new MediaStreamDestination if it doesn't exist
       if (!destination.current) {
         destination.current = audioContext.current.createMediaStreamDestination();
       }
       
-      // Ensure compressor is connected to the destination
-      if (nodes.compressor && destination.current) {
-        nodes.compressor.disconnect();
-        nodes.compressor.connect(destination.current);
-        nodes.compressor.connect(audioContext.current.destination);
-      }
+      // Disconnect compressor from its current destinations
+      nodes.compressor.disconnect();
+      
+      // Connect compressor to both the recording destination and audio output
+      nodes.compressor.connect(destination.current);
+      nodes.compressor.connect(audioContext.current.destination);
       
       mediaRecorder.current = new MediaRecorder(destination.current.stream, {
         mimeType: 'audio/webm;codecs=opus'
@@ -88,6 +92,12 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         setProcessedData(outputArray);
         setShowFormatDialog(true);
         setRecordedChunks([]);
+        
+        // Restore original audio routing
+        if (nodes.compressor && originalDestination.current) {
+          nodes.compressor.disconnect();
+          nodes.compressor.connect(originalDestination.current);
+        }
       };
 
       mediaRecorder.current.start();
