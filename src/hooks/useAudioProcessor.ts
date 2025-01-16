@@ -44,15 +44,15 @@ export const useAudioProcessor = () => {
   const handleLoadAudioFile = async (file: File): Promise<number> => {
     try {
       console.log('Initializing audio context...');
-      const { context, analyzer } = initializeContext();
+      const audioContextData = await initializeContext();
       
-      if (!context || !analyzer) {
+      if (!audioContextData.context || !audioContextData.analyzer) {
         throw new Error('Failed to initialize audio context or analyzer');
       }
 
       // Ensure context is in running state
-      if (context.state === 'suspended') {
-        await context.resume();
+      if (audioContextData.context.state === 'suspended') {
+        await audioContextData.context.resume();
       }
 
       console.log('Setting up equalizer...');
@@ -73,11 +73,11 @@ export const useAudioProcessor = () => {
       // Main signal path
       eq.input.connect(eq.output);
       eq.output.connect(comp.input);
-      comp.output.connect(analyzer);
-      analyzer.connect(context.destination);
+      comp.output.connect(audioContextData.analyzer);
+      audioContextData.analyzer.connect(audioContextData.context.destination);
 
       // Create a parallel path for real-time processing
-      const processingStream = context.createMediaStreamDestination();
+      const processingStream = audioContextData.context.createMediaStreamDestination();
       comp.output.connect(processingStream);
 
       console.log('Loading audio file...');
