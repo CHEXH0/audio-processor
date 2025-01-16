@@ -37,31 +37,28 @@ export const useAudioProcessor = () => {
   const initializeAudioContext = () => {
     if (!audioContext.current) {
       audioContext.current = new AudioContext({
-        sampleRate: 48000, // High quality sample rate
+        sampleRate: 48000,
         latencyHint: 'interactive'
       });
       
-      // Create analyzer with higher resolution
       analyzerNode.current = audioContext.current.createAnalyser();
       analyzerNode.current.fftSize = 2048;
       analyzerNode.current.smoothingTimeConstant = 0.8;
 
-      // Create gain nodes for bypass with proper gain values
       eqInputGain.current = audioContext.current.createGain();
       eqOutputGain.current = audioContext.current.createGain();
       compInputGain.current = audioContext.current.createGain();
       compOutputGain.current = audioContext.current.createGain();
       
-      // Initialize filters with better frequency response
       lowFilter.current = audioContext.current.createBiquadFilter();
       lowFilter.current.type = 'lowshelf';
       lowFilter.current.frequency.value = 320;
-      lowFilter.current.Q.value = 0.71; // Butterworth response
+      lowFilter.current.Q.value = 0.71;
 
       lowMidFilter.current = audioContext.current.createBiquadFilter();
       lowMidFilter.current.type = 'peaking';
       lowMidFilter.current.frequency.value = 1000;
-      lowMidFilter.current.Q.value = 1.4; // Steeper slope for better separation
+      lowMidFilter.current.Q.value = 1.4;
 
       highMidFilter.current = audioContext.current.createBiquadFilter();
       highMidFilter.current.type = 'peaking';
@@ -73,9 +70,8 @@ export const useAudioProcessor = () => {
       highFilter.current.frequency.value = 10000;
       highFilter.current.Q.value = 0.71;
 
-      // Create compressor with optimal initial settings
       compressor.current = audioContext.current.createDynamicsCompressor();
-      compressor.current.knee.value = 12; // Soft knee for smoother compression
+      compressor.current.knee.value = 12;
       compressor.current.ratio.value = 4;
       compressor.current.attack.value = 0.05;
       compressor.current.release.value = 0.2;
@@ -88,16 +84,12 @@ export const useAudioProcessor = () => {
         .connect(highFilter.current!)
         .connect(eqOutputGain.current!);
 
-      eqInputGain.current.connect(eqOutputGain.current!);  // Bypass path
-
       eqOutputGain.current!
         .connect(compInputGain.current!);
 
       compInputGain.current!
         .connect(compressor.current!)
         .connect(compOutputGain.current!);
-
-      compInputGain.current!.connect(compOutputGain.current!);  // Bypass path
 
       compOutputGain.current!
         .connect(analyzerNode.current!)
@@ -116,71 +108,78 @@ export const useAudioProcessor = () => {
   }, []);
 
   const updateProcessingConfig = (config: AudioProcessorConfig) => {
-    if (!eqInputGain.current || !eqOutputGain.current || !compressor.current) return;
+    if (!audioContext.current || !eqInputGain.current || !eqOutputGain.current || !compressor.current) return;
     
-    const currentTime = audioContext.current?.currentTime || 0;
+    const currentTime = audioContext.current.currentTime;
+    const transitionTime = 0.05; // 50ms transition time for smooth parameter changes
     
     // Update EQ parameters with smooth transitions
     if (lowFilter.current && lowMidFilter.current && highMidFilter.current && highFilter.current) {
-      // Smoothly transition bypass states
-      eqInputGain.current.gain.setTargetAtTime(
-        config.eqBypassed ? 1 : 0,
-        currentTime,
-        0.01
-      );
-      
-      // Smoothly transition filter gains
+      // Smoothly transition filter gains using setTargetAtTime
       lowFilter.current.gain.setTargetAtTime(
         config.eqBypassed ? 0 : config.eqParams.low,
         currentTime,
-        0.01
+        transitionTime
       );
+      
       lowMidFilter.current.gain.setTargetAtTime(
         config.eqBypassed ? 0 : config.eqParams.lowMid,
         currentTime,
-        0.01
+        transitionTime
       );
+      
       highMidFilter.current.gain.setTargetAtTime(
         config.eqBypassed ? 0 : config.eqParams.highMid,
         currentTime,
-        0.01
+        transitionTime
       );
+      
       highFilter.current.gain.setTargetAtTime(
         config.eqBypassed ? 0 : config.eqParams.high,
         currentTime,
-        0.01
+        transitionTime
       );
     }
 
     // Update compressor parameters with smooth transitions
-    compInputGain.current.gain.setTargetAtTime(
-      config.compBypassed ? 1 : 0,
-      currentTime,
-      0.01
-    );
-    
-    if (!config.compBypassed) {
+    if (compressor.current && !config.compBypassed) {
       compressor.current.threshold.setTargetAtTime(
         config.compParams.threshold,
         currentTime,
-        0.01
+        transitionTime
       );
+      
       compressor.current.ratio.setTargetAtTime(
         config.compParams.ratio,
         currentTime,
-        0.01
+        transitionTime
       );
+      
       compressor.current.attack.setTargetAtTime(
         config.compParams.attack / 1000,
         currentTime,
-        0.01
+        transitionTime
       );
+      
       compressor.current.release.setTargetAtTime(
         config.compParams.release / 1000,
         currentTime,
-        0.01
+        transitionTime
       );
     }
+
+    // Smoothly transition bypass states
+    eqInputGain.current.gain.setTargetAtTime(
+      config.eqBypassed ? 1 : 0,
+      currentTime,
+      transitionTime
+    );
+    
+    compInputGain.current!.gain.setTargetAtTime(
+      config.compBypassed ? 1 : 0,
+      currentTime,
+      transitionTime
+    );
   };
 
   const loadAudioFile = async (file: File): Promise<number> => {
