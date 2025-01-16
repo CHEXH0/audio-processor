@@ -34,7 +34,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
   const startTime = useRef<number>(0);
-  const recordingStartTime = useRef<number>(0);
 
   const startRecording = async () => {
     try {
@@ -42,7 +41,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       
       recordedChunks.current = [];
       startTime.current = audioContext.current.currentTime;
-      recordingStartTime.current = performance.now();
       
       if (!destination.current) {
         destination.current = audioContext.current.createMediaStreamDestination();
@@ -64,7 +62,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       };
 
       mediaRecorder.current.onstop = async () => {
-        const recordingDuration = (performance.now() - recordingStartTime.current) / 1000;
+        const duration = audioContext.current!.currentTime - startTime.current;
         const blob = new Blob(recordedChunks.current, { type: 'audio/webm' });
         
         const tempContext = new AudioContext({
@@ -74,10 +72,10 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         const arrayBuffer = await blob.arrayBuffer();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
         
-        // Create a new buffer with the exact recording duration
+        // Create a new buffer with the exact duration
         const newBuffer = tempContext.createBuffer(
           audioBuffer.numberOfChannels,
-          Math.ceil(recordingDuration * tempContext.sampleRate),
+          Math.ceil(duration * tempContext.sampleRate),
           tempContext.sampleRate
         );
         
@@ -86,11 +84,11 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
           const channelData = audioBuffer.getChannelData(channel);
           const newChannelData = newBuffer.getChannelData(channel);
           
-          // Copy data with proper timing
-          const scaleFactor = newBuffer.length / audioBuffer.length;
+          // Calculate the correct sample position for each output sample
           for (let i = 0; i < newBuffer.length; i++) {
-            const originalIndex = Math.floor(i / scaleFactor);
-            newChannelData[i] = channelData[originalIndex];
+            const inputPosition = (i * audioBuffer.length) / newBuffer.length;
+            const index = Math.floor(inputPosition);
+            newChannelData[i] = channelData[index];
           }
         }
         
@@ -129,7 +127,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 
   const createWavFile = (audioBuffer: AudioBuffer): Blob => {
     const numOfChan = audioBuffer.numberOfChannels;
-    const sampleRate = audioBuffer.sampleRate;
     const length = audioBuffer.length * numOfChan * 2;
     const buffer = new ArrayBuffer(44 + length);
     const view = new DataView(buffer);
@@ -140,7 +137,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       }
     };
 
-    // Write WAV header with exact timing information
+    // Write WAV header
     writeString(view, 0, 'RIFF');
     view.setUint32(4, 36 + length, true);
     writeString(view, 8, 'WAVE');
@@ -148,8 +145,8 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, numOfChan, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * numOfChan * 2, true);
+    view.setUint32(24, audioBuffer.sampleRate, true);
+    view.setUint32(28, audioBuffer.sampleRate * numOfChan * 2, true);
     view.setUint16(32, numOfChan * 2, true);
     view.setUint16(34, 16, true);
     writeString(view, 36, 'data');
@@ -158,7 +155,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     const offset = 44;
     let index = 0;
 
-    // Write audio data with proper timing
+    // Write audio data
     for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
       const channelData = audioBuffer.getChannelData(i);
       for (let j = 0; j < channelData.length; j++) {
