@@ -93,8 +93,6 @@ const VST = () => {
             audioContext={audioContext}
             nodes={nodes}
             hasAudioFile={!!audioFile}
-            isPlaying={isPlaying}
-            onPlaybackStart={handlePlayPause}
           />
         </div>
         
