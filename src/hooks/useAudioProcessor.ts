@@ -67,11 +67,12 @@ export const useAudioProcessor = () => {
         throw new Error('Failed to setup compressor');
       }
 
+      // Connect the audio processing chain
       console.log('Connecting audio processing chain...');
       eq.output.connect(comp.input);
       comp.output.connect(analyzer);
       analyzer.connect(context.destination);
-      
+
       console.log('Loading audio file...');
       const duration = await loadAudioFile(file);
       console.log('Audio file loaded successfully, duration:', duration);
@@ -98,6 +99,9 @@ export const useAudioProcessor = () => {
       if (!eq) {
         throw new Error('Failed to setup equalizer for playback');
       }
+
+      // Make sure the audio context is active
+      await context.resume();
       
       console.log('Starting audio playback...');
       await playAudio(startTime, isLooping, eq.input);

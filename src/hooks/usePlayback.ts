@@ -49,8 +49,11 @@ export const usePlayback = (audioContext: AudioContext | null) => {
       audioSource.current.buffer = audioBuffer.current;
       audioSource.current.loop = isLooping;
       
+      // Ensure proper connection to the audio graph
       console.log('Connecting audio source to input node...');
       audioSource.current.connect(inputNode);
+      
+      // Start playback
       audioSource.current.start(0, startTime);
       console.log('Audio playback started successfully');
     } catch (error) {
