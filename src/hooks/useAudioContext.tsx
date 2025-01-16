@@ -21,7 +21,11 @@ export const useAudioContext = () => {
   });
 
   useEffect(() => {
-    audioContext.current = new AudioContext();
+    // Create audio context with MediaStream destination support
+    audioContext.current = new (window.AudioContext || (window as any).webkitAudioContext)({
+      latencyHint: 'interactive',
+      sampleRate: 44100,
+    });
     
     // Create filters
     const lowFilter = audioContext.current.createBiquadFilter();

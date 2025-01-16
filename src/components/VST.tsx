@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Mic, Download } from "lucide-react";
 import EQVisualizer from './EQVisualizer';
 import TransportControls from './audio/TransportControls';
 import FileControls from './audio/FileControls';
@@ -14,6 +16,9 @@ const VST = () => {
   const { toast } = useToast();
   const session = useSession();
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const mediaRecorder = React.useRef<MediaRecorder | null>(null);
   
   const { audioContext, audioSource, audioBuffer, nodes } = useAudioContext();
   const { 
@@ -62,6 +67,58 @@ const VST = () => {
     }
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = audioContext.current!.destination.stream;
+      mediaRecorder.current = new MediaRecorder(stream);
+      
+      mediaRecorder.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          setRecordedChunks((chunks) => [...chunks, event.data]);
+        }
+      };
+
+      mediaRecorder.current.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'processed_audio.wav';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        setRecordedChunks([]);
+      };
+
+      mediaRecorder.current.start();
+      setIsRecording(true);
+      
+      toast({
+        title: "Recording started",
+        description: "Processing audio in real-time...",
+      });
+    } catch (error) {
+      console.error('Recording error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to start recording",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') {
+      mediaRecorder.current.stop();
+      setIsRecording(false);
+      toast({
+        title: "Recording complete",
+        description: "Your processed audio is ready for download",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen p-8 flex flex-col gap-8">
       <Card className="glass-panel p-8">
@@ -85,6 +142,17 @@ const VST = () => {
             onFileChange={handleFileChange}
             hasAudioFile={!!audioFile}
           />
+        </div>
+
+        <div className="mb-8 flex gap-4">
+          <Button
+            variant={isRecording ? "destructive" : "default"}
+            onClick={isRecording ? stopRecording : startRecording}
+            disabled={!audioFile || !isPlaying}
+          >
+            <Mic className="h-4 w-4 mr-2" />
+            {isRecording ? "Stop Recording" : "Record Processing"}
+          </Button>
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
