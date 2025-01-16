@@ -19,4 +19,7 @@ port = 54324
 
 [db]
 port = 54322
-pooler_port = 54329
+
+[db.pooler]
+enabled = true
+port = 54329
