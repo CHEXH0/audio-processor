@@ -2,13 +2,6 @@ import React, { useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Mic } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 
 interface RecordingControlsProps {
   audioContext: React.MutableRefObject<AudioContext | null>;
@@ -30,7 +23,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
-  const [exportFormat, setExportFormat] = useState<'wav' | 'mp3'>('wav');
   const mediaRecorder = useRef<MediaRecorder | null>(null);
 
   const startRecording = async () => {
@@ -40,7 +32,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       const destination = audioContext.current.createMediaStreamDestination();
       nodes.compressor?.connect(destination);
       
-      // Always record in WebM format, which is widely supported
       mediaRecorder.current = new MediaRecorder(destination.stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
@@ -73,15 +64,13 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
           }
         }
         
-        // Create WAV or MP3 format blob
-        const finalBlob = new Blob([outputArray.buffer], { 
-          type: exportFormat === 'wav' ? 'audio/wav' : 'audio/mpeg' 
-        });
+        // Create WAV format blob
+        const finalBlob = new Blob([outputArray.buffer], { type: 'audio/wav' });
         
         const url = URL.createObjectURL(finalBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `processed_audio.${exportFormat}`;
+        a.download = 'processed_audio.wav';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -131,19 +120,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         <Mic className="h-4 w-4 mr-2" />
         {isRecording ? "Stop Recording" : "Record Processing"}
       </Button>
-
-      <Select
-        value={exportFormat}
-        onValueChange={(value: 'wav' | 'mp3') => setExportFormat(value)}
-      >
-        <SelectTrigger className="w-[180px]">
-          <SelectValue placeholder="Select format" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="wav">WAV Format</SelectItem>
-          <SelectItem value="mp3">MP3 Format</SelectItem>
-        </SelectContent>
-      </Select>
     </div>
   );
 };
