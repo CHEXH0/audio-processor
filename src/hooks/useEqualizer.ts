@@ -22,6 +22,14 @@ export const useEqualizer = (audioContext: AudioContext | null) => {
     }
 
     try {
+      // Clean up existing nodes
+      if (eqInputGain.current) {
+        eqInputGain.current.disconnect();
+      }
+      if (eqOutputGain.current) {
+        eqOutputGain.current.disconnect();
+      }
+
       console.log('Creating EQ input gain...');
       eqInputGain.current = audioContext.createGain();
       

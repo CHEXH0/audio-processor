@@ -42,46 +42,32 @@ export const useAudioProcessor = () => {
   };
 
   const handleLoadAudioFile = async (file: File): Promise<number> => {
-    console.log('Initializing audio context...');
-    const { context, analyzer } = initializeContext();
-    
-    if (!context) {
-      console.error('Failed to initialize audio context');
-      throw new Error('Failed to initialize audio context');
-    }
-
-    if (!analyzer) {
-      console.error('Failed to initialize analyzer');
-      throw new Error('Failed to initialize analyzer');
-    }
-
-    // Ensure context is in running state
-    if (context.state === 'suspended') {
-      try {
-        await context.resume();
-      } catch (error) {
-        console.error('Failed to resume audio context:', error);
-        throw new Error('Failed to resume audio context');
-      }
-    }
-
-    console.log('Setting up equalizer...');
-    const eq = setupEqualizer();
-    if (!eq) {
-      console.error('Failed to setup equalizer nodes');
-      throw new Error('Failed to setup equalizer');
-    }
-
-    console.log('Setting up compressor...');
-    const comp = setupCompressor();
-    if (!comp) {
-      console.error('Failed to setup compressor nodes');
-      throw new Error('Failed to setup compressor');
-    }
-
     try {
+      console.log('Initializing audio context...');
+      const { context, analyzer } = initializeContext();
+      
+      if (!context || !analyzer) {
+        throw new Error('Failed to initialize audio context or analyzer');
+      }
+
+      // Ensure context is in running state
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+
+      console.log('Setting up equalizer...');
+      const eq = setupEqualizer();
+      if (!eq) {
+        throw new Error('Failed to setup equalizer');
+      }
+
+      console.log('Setting up compressor...');
+      const comp = setupCompressor();
+      if (!comp) {
+        throw new Error('Failed to setup compressor');
+      }
+
       console.log('Connecting audio processing chain...');
-      // Connect the full processing chain
       eq.output.connect(comp.input);
       comp.output.connect(analyzer);
       analyzer.connect(context.destination);
@@ -92,24 +78,27 @@ export const useAudioProcessor = () => {
       return duration;
     } catch (error) {
       console.error('Error in audio processing chain:', error);
-      throw new Error('Failed to setup audio processing chain');
+      throw error;
     }
   };
 
   const handlePlayAudio = async (startTime: number = 0, isLooping: boolean = false) => {
-    const context = getContext();
-    if (!context) {
-      throw new Error('Audio context not initialized');
-    }
-
-    console.log('Setting up audio playback...');
-    const eq = setupEqualizer();
-    if (!eq) {
-      console.error('Failed to setup equalizer for playback');
-      throw new Error('Failed to setup audio processing');
-    }
-    
     try {
+      const context = getContext();
+      if (!context) {
+        throw new Error('Audio context not initialized');
+      }
+
+      if (context.state === 'suspended') {
+        await context.resume();
+      }
+
+      console.log('Setting up audio playback...');
+      const eq = setupEqualizer();
+      if (!eq) {
+        throw new Error('Failed to setup equalizer for playback');
+      }
+      
       console.log('Starting audio playback...');
       await playAudio(startTime, isLooping, eq.input);
       console.log('Audio playback started successfully');

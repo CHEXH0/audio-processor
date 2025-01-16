@@ -6,38 +6,31 @@ export const useAudioContext = () => {
 
   const initializeContext = () => {
     console.log('Initializing audio context...');
-    if (!audioContext.current) {
-      try {
+    try {
+      if (!audioContext.current) {
         audioContext.current = new AudioContext({
           sampleRate: 48000,
           latencyHint: 'interactive'
         });
-        
+      } else if (audioContext.current.state === 'suspended') {
+        audioContext.current.resume();
+      }
+
+      if (!analyzerNode.current && audioContext.current) {
         analyzerNode.current = audioContext.current.createAnalyser();
         analyzerNode.current.fftSize = 2048;
         analyzerNode.current.smoothingTimeConstant = 0.8;
-        
-        console.log('Audio context initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize audio context:', error);
-        throw error;
       }
-    } else if (audioContext.current.state === 'suspended') {
-      audioContext.current.resume().catch(error => {
-        console.error('Failed to resume audio context:', error);
-        throw error;
-      });
-    }
 
-    if (!analyzerNode.current) {
-      console.error('Analyzer node not initialized properly');
-      throw new Error('Failed to initialize analyzer node');
+      console.log('Audio context initialized successfully');
+      return {
+        context: audioContext.current,
+        analyzer: analyzerNode.current
+      };
+    } catch (error) {
+      console.error('Failed to initialize audio context:', error);
+      throw new Error('Failed to initialize audio context');
     }
-
-    return {
-      context: audioContext.current,
-      analyzer: analyzerNode.current
-    };
   };
 
   useEffect(() => {
@@ -51,17 +44,7 @@ export const useAudioContext = () => {
 
   return {
     initializeContext,
-    getContext: () => {
-      if (!audioContext.current) {
-        console.warn('Audio context not initialized');
-      }
-      return audioContext.current;
-    },
-    getAnalyzer: () => {
-      if (!analyzerNode.current) {
-        console.warn('Analyzer node not initialized');
-      }
-      return analyzerNode.current;
-    }
+    getContext: () => audioContext.current,
+    getAnalyzer: () => analyzerNode.current
   };
 };
