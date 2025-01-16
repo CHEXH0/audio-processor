@@ -32,8 +32,12 @@ const VST = () => {
   const {
     eqParams,
     compParams,
+    eqBypassed,
+    compBypassed,
     handleEQChange,
     handleCompChange,
+    setEqBypassed,
+    setCompBypassed,
   } = useAudioProcessor(nodes);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -152,13 +156,20 @@ const VST = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="space-y-6">
-            <EQVisualizer parameters={eqParams} />
+            <EQVisualizer 
+              parameters={eqParams} 
+              onParameterChange={handleEQChange}
+              bypassed={eqBypassed}
+              onBypassChange={setEqBypassed}
+            />
           </div>
 
           <CompressorControls
             parameters={compParams}
             onParameterChange={handleCompChange}
             isPlaying={isPlaying}
+            bypassed={compBypassed}
+            onBypassChange={setCompBypassed}
           />
         </div>
       </Card>

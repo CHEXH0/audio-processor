@@ -9,6 +9,7 @@ interface CompressorParameterProps {
   max: number;
   step: number;
   unit: string;
+  disabled?: boolean;
   onChange: (value: number) => void;
 }
 
@@ -20,6 +21,7 @@ const CompressorParameter: React.FC<CompressorParameterProps> = ({
   max,
   step,
   unit,
+  disabled,
   onChange,
 }) => {
   return (
@@ -35,6 +37,7 @@ const CompressorParameter: React.FC<CompressorParameterProps> = ({
         step={step}
         className="parameter-change"
         onValueChange={([v]) => onChange(v)}
+        disabled={disabled}
       />
       <div className="flex justify-between items-center">
         <span className="parameter-value">

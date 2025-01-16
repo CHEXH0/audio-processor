@@ -3,14 +3,16 @@ import React from 'react';
 interface GainReductionMeterProps {
   isPlaying: boolean;
   calculateGainReduction: (level: number) => number;
+  bypassed?: boolean;
 }
 
 const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
   isPlaying,
   calculateGainReduction,
+  bypassed,
 }) => {
   return (
-    <div className="glass-panel p-4 rounded-lg border border-border/50">
+    <div className={`glass-panel p-4 rounded-lg border border-border/50 transition-opacity ${bypassed ? "opacity-50" : ""}`}>
       <h3 className="text-sm font-medium mb-2">Gain Reduction Meter</h3>
       <div className="flex justify-between items-end h-32">
         <div className="flex gap-2 w-full">
@@ -19,7 +21,7 @@ const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
               className="meter-bar bg-primary/80 w-full transition-all duration-100"
               style={{
                 height: `${Math.max(0, Math.min(100, 
-                  isPlaying ? Math.abs(calculateGainReduction(-6)) * 8 : 0
+                  isPlaying && !bypassed ? Math.abs(calculateGainReduction(-6)) * 8 : 0
                 ))}%`
               }}
             />
@@ -29,7 +31,7 @@ const GainReductionMeter: React.FC<GainReductionMeterProps> = ({
               className="meter-bar bg-primary/80 w-full transition-all duration-100"
               style={{
                 height: `${Math.max(0, Math.min(100, 
-                  isPlaying ? Math.abs(calculateGainReduction(-3)) * 8 : 0
+                  isPlaying && !bypassed ? Math.abs(calculateGainReduction(-3)) * 8 : 0
                 ))}%`
               }}
             />

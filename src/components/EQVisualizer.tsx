@@ -1,6 +1,7 @@
 import React from 'react';
-import { SlidersHorizontal } from 'lucide-react';
+import { SlidersHorizontal, Power } from 'lucide-react';
 import { Slider } from "@/components/ui/slider";
+import { Button } from "@/components/ui/button";
 import EQGrid from './eq/EQGrid';
 import FrequencyBands from './eq/FrequencyBands';
 import EQCurve from './eq/EQCurve';
@@ -13,10 +14,17 @@ interface EQVisualizerProps {
     highMid: number;
     high: number;
   };
+  bypassed: boolean;
   onParameterChange?: (parameter: string, value: number) => void;
+  onBypassChange?: (bypassed: boolean) => void;
 }
 
-const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChange }) => {
+const EQVisualizer: React.FC<EQVisualizerProps> = ({ 
+  parameters, 
+  bypassed,
+  onParameterChange,
+  onBypassChange 
+}) => {
   const width = 600;
   const height = 300;
 
@@ -26,12 +34,22 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChan
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-4">
-        <SlidersHorizontal className="w-6 h-6 text-primary" />
-        <h3 className="text-xl font-medium">Equalizer</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <SlidersHorizontal className="w-6 h-6 text-primary" />
+          <h3 className="text-xl font-medium">Equalizer</h3>
+        </div>
+        <Button
+          variant={bypassed ? "outline" : "default"}
+          size="icon"
+          onClick={() => onBypassChange?.(!bypassed)}
+          className={bypassed ? "opacity-50" : ""}
+        >
+          <Power className="h-4 w-4" />
+        </Button>
       </div>
       
-      <div className="relative w-full aspect-[2/1] min-h-[300px] glass-panel overflow-hidden rounded-lg border border-border/50">
+      <div className={`relative w-full aspect-[2/1] min-h-[300px] glass-panel overflow-hidden rounded-lg border border-border/50 transition-opacity ${bypassed ? "opacity-50" : ""}`}>
         <svg 
           width="100%" 
           height="100%" 
@@ -41,8 +59,8 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChan
         >
           <EQGrid width={width} height={height} />
           <FrequencyBands width={width} height={height} />
-          <EQCurve width={width} height={height} parameters={parameters} />
-          <EQControlPoints width={width} height={height} parameters={parameters} />
+          <EQCurve width={width} height={height} parameters={bypassed ? { low: 0, lowMid: 0, highMid: 0, high: 0 } : parameters} />
+          <EQControlPoints width={width} height={height} parameters={bypassed ? { low: 0, lowMid: 0, highMid: 0, high: 0 } : parameters} />
         </svg>
       </div>
 
@@ -55,6 +73,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChan
             max={12}
             step={0.1}
             onValueChange={handleSliderChange('low')}
+            disabled={bypassed}
           />
         </div>
         <div className="space-y-2">
@@ -65,6 +84,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChan
             max={12}
             step={0.1}
             onValueChange={handleSliderChange('lowMid')}
+            disabled={bypassed}
           />
         </div>
         <div className="space-y-2">
@@ -75,6 +95,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChan
             max={12}
             step={0.1}
             onValueChange={handleSliderChange('highMid')}
+            disabled={bypassed}
           />
         </div>
         <div className="space-y-2">
@@ -85,6 +106,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChan
             max={12}
             step={0.1}
             onValueChange={handleSliderChange('high')}
+            disabled={bypassed}
           />
         </div>
       </div>

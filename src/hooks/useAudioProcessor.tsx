@@ -23,23 +23,34 @@ export const useAudioProcessor = (nodes: AudioNodes) => {
     release: 200
   });
 
+  const [eqBypassed, setEqBypassed] = useState(false);
+  const [compBypassed, setCompBypassed] = useState(false);
+
   useEffect(() => {
     if (!nodes.lowFilter) return;
 
-    nodes.lowFilter.gain.value = eqParams.low;
-    nodes.lowMidFilter!.gain.value = eqParams.lowMid;
-    nodes.highMidFilter!.gain.value = eqParams.highMid;
-    nodes.highFilter!.gain.value = eqParams.high;
-  }, [eqParams, nodes]);
+    const gainValue = eqBypassed ? 0 : eqParams.low;
+    nodes.lowFilter.gain.value = gainValue;
+    nodes.lowMidFilter!.gain.value = eqBypassed ? 0 : eqParams.lowMid;
+    nodes.highMidFilter!.gain.value = eqBypassed ? 0 : eqParams.highMid;
+    nodes.highFilter!.gain.value = eqBypassed ? 0 : eqParams.high;
+  }, [eqParams, nodes, eqBypassed]);
 
   useEffect(() => {
     if (!nodes.compressor) return;
 
-    nodes.compressor.threshold.value = compParams.threshold;
-    nodes.compressor.ratio.value = compParams.ratio;
-    nodes.compressor.attack.value = compParams.attack / 1000;
-    nodes.compressor.release.value = compParams.release / 1000;
-  }, [compParams, nodes]);
+    if (compBypassed) {
+      nodes.compressor.threshold.value = 0;
+      nodes.compressor.ratio.value = 1;
+      nodes.compressor.attack.value = 0;
+      nodes.compressor.release.value = 0;
+    } else {
+      nodes.compressor.threshold.value = compParams.threshold;
+      nodes.compressor.ratio.value = compParams.ratio;
+      nodes.compressor.attack.value = compParams.attack / 1000;
+      nodes.compressor.release.value = compParams.release / 1000;
+    }
+  }, [compParams, nodes, compBypassed]);
 
   const handleEQChange = (band: keyof typeof eqParams, value: number) => {
     setEqParams(prev => ({ ...prev, [band]: value }));
@@ -52,7 +63,11 @@ export const useAudioProcessor = (nodes: AudioNodes) => {
   return {
     eqParams,
     compParams,
+    eqBypassed,
+    compBypassed,
     handleEQChange,
     handleCompChange,
+    setEqBypassed,
+    setCompBypassed,
   };
 };
