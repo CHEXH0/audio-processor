@@ -1,17 +1,8 @@
 import React, { useRef, useState } from 'react';
-import { Button } from "@/components/ui/button";
-import { Mic } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogAction,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog";
+import RecordingButton from './recording/RecordingButton';
+import FormatDialog from './recording/FormatDialog';
+import { createWavFile } from '@/utils/audioExport';
 
 interface RecordingControlsProps {
   audioContext: React.MutableRefObject<AudioContext | null>;
@@ -97,62 +88,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     }
   };
 
-  const createWavFile = (audioBuffer: AudioBuffer): Blob => {
-    const numOfChan = audioBuffer.numberOfChannels;
-    const length = audioBuffer.length * numOfChan * 2;
-    const buffer = new ArrayBuffer(44 + length);
-    const view = new DataView(buffer);
-    
-    const writeString = (view: DataView, offset: number, string: string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i));
-      }
-    };
-
-    // Write WAV header
-    writeString(view, 0, 'RIFF');
-    view.setUint32(4, 36 + length, true);
-    writeString(view, 8, 'WAVE');
-    writeString(view, 12, 'fmt ');
-    view.setUint32(16, 16, true);
-    view.setUint16(20, 1, true);
-    view.setUint16(22, numOfChan, true);
-    view.setUint32(24, audioBuffer.sampleRate, true);
-    view.setUint32(28, audioBuffer.sampleRate * numOfChan * 2, true);
-    view.setUint16(32, numOfChan * 2, true);
-    view.setUint16(34, 16, true);
-    writeString(view, 36, 'data');
-    view.setUint32(40, length, true);
-
-    // Write audio data
-    const offset = 44;
-    const channelData = new Float32Array(audioBuffer.length * numOfChan);
-    let channelIdx = 0;
-
-    // Interleave channel data
-    for (let i = 0; i < audioBuffer.length; i++) {
-      for (let channel = 0; channel < numOfChan; channel++) {
-        channelData[channelIdx++] = audioBuffer.getChannelData(channel)[i];
-      }
-    }
-
-    // Convert to 16-bit PCM
-    const volume = 0.9;
-    const pcmData = new Int16Array(channelData.length);
-    for (let i = 0; i < channelData.length; i++) {
-      const s = Math.max(-1, Math.min(1, channelData[i]));
-      pcmData[i] = s < 0 ? s * 0x8000 * volume : s * 0x7FFF * volume;
-    }
-
-    // Copy PCM data to WAV buffer
-    const pcmBytes = new Uint8Array(pcmData.buffer);
-    for (let i = 0; i < pcmBytes.length; i++) {
-      view.setUint8(offset + i, pcmBytes[i]);
-    }
-
-    return new Blob([buffer], { type: 'audio/wav' });
-  };
-
   const handleExport = async (format: 'wav' | 'mp3') => {
     if (!processedData) return;
 
@@ -184,35 +119,19 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   return (
     <>
       <div className="flex gap-4 items-center">
-        <Button
-          variant={isRecording ? "destructive" : "default"}
-          onClick={isRecording ? stopRecording : startRecording}
+        <RecordingButton
+          isRecording={isRecording}
+          onStartRecording={startRecording}
+          onStopRecording={stopRecording}
           disabled={!hasAudioFile}
-        >
-          <Mic className="h-4 w-4 mr-2" />
-          {isRecording ? "Stop Recording" : "Record Processing"}
-        </Button>
+        />
       </div>
 
-      <AlertDialog open={showFormatDialog} onOpenChange={setShowFormatDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Choose Export Format</AlertDialogTitle>
-            <AlertDialogDescription>
-              Select the format you want to export your processed audio in.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex gap-2">
-            <AlertDialogAction onClick={() => handleExport('wav')}>
-              Export as WAV
-            </AlertDialogAction>
-            <AlertDialogAction onClick={() => handleExport('mp3')}>
-              Export as MP3
-            </AlertDialogAction>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <FormatDialog
+        open={showFormatDialog}
+        onOpenChange={setShowFormatDialog}
+        onExport={handleExport}
+      />
     </>
   );
 };
