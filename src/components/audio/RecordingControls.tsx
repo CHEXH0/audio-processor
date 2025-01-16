@@ -33,12 +33,14 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
+  const startTime = useRef<number>(0);
 
   const startRecording = async () => {
     try {
       if (!audioContext.current || !nodes.compressor) return;
       
       recordedChunks.current = [];
+      startTime.current = audioContext.current.currentTime;
       
       if (!destination.current) {
         destination.current = audioContext.current.createMediaStreamDestination();
@@ -60,11 +62,27 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       mediaRecorder.current.onstop = async () => {
         const blob = new Blob(recordedChunks.current, { type: 'audio/webm' });
         const tempContext = new AudioContext({
-          sampleRate: audioContext.current!.sampleRate // Match original context sample rate
+          sampleRate: audioContext.current!.sampleRate
         });
+        
         const arrayBuffer = await blob.arrayBuffer();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
-        setProcessedData(audioBuffer);
+        
+        // Create a new buffer with the correct timing
+        const duration = audioContext.current!.currentTime - startTime.current;
+        const newBuffer = tempContext.createBuffer(
+          audioBuffer.numberOfChannels,
+          Math.ceil(duration * tempContext.sampleRate),
+          tempContext.sampleRate
+        );
+        
+        // Copy the data maintaining the original timing
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+          const channelData = audioBuffer.getChannelData(channel);
+          newBuffer.copyToChannel(channelData, channel);
+        }
+        
+        setProcessedData(newBuffer);
         setShowFormatDialog(true);
         
         if (nodes.compressor) {
@@ -110,7 +128,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       }
     };
 
-    // Write WAV header with correct sample rate
     writeString(view, 0, 'RIFF');
     view.setUint32(4, 36 + length, true);
     writeString(view, 8, 'WAVE');
@@ -119,13 +136,12 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     view.setUint16(20, 1, true);
     view.setUint16(22, numOfChan, true);
     view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * numOfChan * 2, true); // Bytes per second
+    view.setUint32(28, sampleRate * numOfChan * 2, true);
     view.setUint16(32, numOfChan * 2, true);
     view.setUint16(34, 16, true);
     writeString(view, 36, 'data');
     view.setUint32(40, length, true);
 
-    // Write audio data maintaining original timing
     const offset = 44;
     let index = 0;
 
