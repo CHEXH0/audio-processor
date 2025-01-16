@@ -14,11 +14,25 @@ const FileControls: React.FC<FileControlsProps> = ({
   onExport,
   hasAudioFile,
 }) => {
+  // List of supported audio formats
+  const supportedFormats = [
+    'audio/mpeg',        // .mp3
+    'audio/wav',         // .wav
+    'audio/x-wav',       // alternative MIME type for .wav
+    'audio/ogg',         // .ogg
+    'audio/aac',         // .aac
+    'audio/m4a',         // .m4a
+    'audio/x-m4a',       // alternative MIME type for .m4a
+    'audio/mp4',         // .mp4 audio
+    'audio/webm',        // .webm audio
+    'audio/flac'         // .flac
+  ].join(',');
+
   return (
     <div className="space-y-4">
       <Input
         type="file"
-        accept="audio/*"
+        accept={supportedFormats}
         onChange={onFileChange}
         className="max-w-xs"
       />
