@@ -20,8 +20,19 @@ serve(async (req) => {
     // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
+
+    // Get the user ID from the authorization header
+    const authHeader = req.headers.get('authorization')?.split('Bearer ')[1]
+    if (!authHeader) {
+      throw new Error('No authorization header')
+    }
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader)
+    if (userError || !user) {
+      throw new Error('Invalid user token')
+    }
 
     // Upload original file to storage
     const timestamp = new Date().getTime()
@@ -33,17 +44,15 @@ serve(async (req) => {
 
     if (uploadError) throw uploadError
 
-    // In a real implementation, you would process the audio file here
-    // For now, we're just storing the original file
-    
-    // Store the track information
+    // Store the track information with user_id
     const { data: trackData, error: trackError } = await supabase
       .from('audio_tracks')
       .insert({
         file_path: filePath,
         title: file.name,
         eq_settings: settings.eq,
-        comp_settings: settings.comp
+        comp_settings: settings.comp,
+        user_id: user.id // Set the user_id from the authenticated user
       })
       .select()
       .single()
@@ -64,6 +73,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
+    console.error('Process audio error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       {
