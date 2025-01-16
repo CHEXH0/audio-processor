@@ -28,15 +28,18 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 }) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
-  const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [processedData, setProcessedData] = useState<Float32Array | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const recordedChunks = useRef<Blob[]>([]);
 
   const startRecording = async () => {
     try {
       if (!audioContext.current || !nodes.compressor) return;
+      
+      // Reset recorded chunks at the start of each recording
+      recordedChunks.current = [];
       
       // Create a new MediaStreamDestination if it doesn't exist
       if (!destination.current) {
@@ -53,12 +56,12 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       
       mediaRecorder.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setRecordedChunks((chunks) => [...chunks, event.data]);
+          recordedChunks.current.push(event.data);
         }
       };
 
       mediaRecorder.current.onstop = async () => {
-        const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+        const blob = new Blob(recordedChunks.current, { type: 'audio/webm' });
         
         // Create a temporary audio context for processing
         const tempContext = new AudioContext();
@@ -80,7 +83,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         
         setProcessedData(outputArray);
         setShowFormatDialog(true);
-        setRecordedChunks([]);
         
         // Restore audio routing
         if (nodes.compressor) {
