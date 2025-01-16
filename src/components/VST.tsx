@@ -20,6 +20,13 @@ const VST = () => {
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const playbackTimer = useRef<number | null>(null);
 
+  // Audio processing nodes
+  const lowFilter = useRef<BiquadFilterNode | null>(null);
+  const lowMidFilter = useRef<BiquadFilterNode | null>(null);
+  const highMidFilter = useRef<BiquadFilterNode | null>(null);
+  const highFilter = useRef<BiquadFilterNode | null>(null);
+  const compressor = useRef<DynamicsCompressorNode | null>(null);
+
   const [eqParams, setEqParams] = useState({
     low: 0,
     lowMid: 0,
@@ -34,8 +41,40 @@ const VST = () => {
     release: 200
   });
 
+  // Initialize audio context and nodes
   useEffect(() => {
     audioContext.current = new AudioContext();
+    
+    // Create filters
+    lowFilter.current = audioContext.current.createBiquadFilter();
+    lowFilter.current.type = 'lowshelf';
+    lowFilter.current.frequency.value = 320;
+
+    lowMidFilter.current = audioContext.current.createBiquadFilter();
+    lowMidFilter.current.type = 'peaking';
+    lowMidFilter.current.frequency.value = 1000;
+    lowMidFilter.current.Q.value = 1;
+
+    highMidFilter.current = audioContext.current.createBiquadFilter();
+    highMidFilter.current.type = 'peaking';
+    highMidFilter.current.frequency.value = 3200;
+    highMidFilter.current.Q.value = 1;
+
+    highFilter.current = audioContext.current.createBiquadFilter();
+    highFilter.current.type = 'highshelf';
+    highFilter.current.frequency.value = 10000;
+
+    // Create compressor
+    compressor.current = audioContext.current.createDynamicsCompressor();
+
+    // Connect nodes
+    lowFilter.current
+      .connect(lowMidFilter.current)
+      .connect(highMidFilter.current)
+      .connect(highFilter.current)
+      .connect(compressor.current)
+      .connect(audioContext.current.destination);
+
     return () => {
       if (playbackTimer.current) {
         cancelAnimationFrame(playbackTimer.current);
@@ -44,14 +83,35 @@ const VST = () => {
     };
   }, []);
 
+  // Update EQ parameters
+  useEffect(() => {
+    if (!audioContext.current) return;
+
+    lowFilter.current!.gain.value = eqParams.low;
+    lowMidFilter.current!.gain.value = eqParams.lowMid;
+    highMidFilter.current!.gain.value = eqParams.highMid;
+    highFilter.current!.gain.value = eqParams.high;
+  }, [eqParams]);
+
+  // Update compressor parameters
+  useEffect(() => {
+    if (!compressor.current) return;
+
+    compressor.current.threshold.value = compParams.threshold;
+    compressor.current.ratio.value = compParams.ratio;
+    compressor.current.attack.value = compParams.attack / 1000; // Convert to seconds
+    compressor.current.release.value = compParams.release / 1000; // Convert to seconds
+  }, [compParams]);
+
   // Update timer during playback
   useEffect(() => {
     const updatePlaybackTime = () => {
       if (isPlaying && audioContext.current) {
         setCurrentTime(prev => {
-          const newTime = prev + audioContext.current!.currentTime - (audioContext.current!.currentTime | 0);
+          const newTime = prev + 0.016; // Approximately 60fps
           if (newTime >= duration) {
             if (isLooping) {
+              handleSeek(0);
               return 0;
             } else {
               setIsPlaying(false);
@@ -111,7 +171,10 @@ const VST = () => {
       audioSource.current = audioContext.current.createBufferSource();
       audioSource.current.buffer = audioBuffer.current;
       audioSource.current.loop = isLooping;
-      audioSource.current.connect(audioContext.current.destination);
+      
+      // Connect through the processing chain
+      audioSource.current.connect(lowFilter.current!);
+      
       audioSource.current.start(0, currentTime);
       setIsPlaying(true);
     }
@@ -124,7 +187,7 @@ const VST = () => {
       audioSource.current = audioContext.current!.createBufferSource();
       audioSource.current.buffer = audioBuffer.current;
       audioSource.current.loop = isLooping;
-      audioSource.current.connect(audioContext.current!.destination);
+      audioSource.current.connect(lowFilter.current!);
       audioSource.current.start(0, time);
     }
   };
@@ -182,6 +245,7 @@ const VST = () => {
         URL.revokeObjectURL(url);
       }
     } catch (error) {
+      console.error('Export error:', error);
       toast({
         title: "Error",
         description: "Failed to process audio",
