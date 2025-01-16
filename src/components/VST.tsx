@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
 import EQVisualizer from './EQVisualizer';
 import TransportControls from './audio/TransportControls';
 import FileControls from './audio/FileControls';
@@ -63,71 +62,6 @@ const VST = () => {
     }
   };
 
-  const handleExport = async (format: 'wav' | 'mp3') => {
-    if (!audioFile) {
-      toast({
-        title: "Error",
-        description: "No audio file loaded",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!session) {
-      toast({
-        title: "Error",
-        description: "Please sign in to export audio",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      const formData = new FormData();
-      formData.append('file', audioFile);
-      formData.append('settings', JSON.stringify({
-        eq: eqParams,
-        comp: compParams
-      }));
-
-      const { data, error } = await supabase.functions.invoke('process-audio', {
-        body: formData,
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Audio processed and saved successfully",
-      });
-
-      const { data: fileData } = await supabase.storage
-        .from('audio_files')
-        .download(data.file.path);
-
-      if (fileData) {
-        const url = URL.createObjectURL(fileData);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `processed_${audioFile.name}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('Export error:', error);
-      toast({
-        title: "Error",
-        description: "Failed to process audio",
-        variant: "destructive",
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen p-8 flex flex-col gap-8">
       <Card className="glass-panel p-8">
@@ -149,7 +83,6 @@ const VST = () => {
         <div className="mb-8">
           <FileControls
             onFileChange={handleFileChange}
-            onExport={handleExport}
             hasAudioFile={!!audioFile}
           />
         </div>
