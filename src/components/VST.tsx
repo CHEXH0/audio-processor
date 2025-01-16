@@ -69,8 +69,15 @@ const VST = () => {
 
   const startRecording = async () => {
     try {
-      const stream = audioContext.current!.destination.stream;
-      mediaRecorder.current = new MediaRecorder(stream);
+      if (!audioContext.current) return;
+      
+      // Create a MediaStreamDestination node
+      const destination = audioContext.current.createMediaStreamDestination();
+      
+      // Connect the compressor to both the audio context destination and the media stream destination
+      nodes.compressor?.connect(destination);
+      
+      mediaRecorder.current = new MediaRecorder(destination.stream);
       
       mediaRecorder.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
