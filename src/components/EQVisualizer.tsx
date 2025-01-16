@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Toggle } from "@/components/ui/toggle";
 import { Slider } from "@/components/ui/slider";
 import { ToggleLeft, ToggleRight } from "lucide-react";
@@ -14,6 +14,7 @@ interface EQVisualizerProps {
   onParameterChange: (param: string, value: number) => void;
   bypassed: boolean;
   onBypassChange: (bypassed: boolean) => void;
+  analyzerNode?: AnalyserNode | null;
 }
 
 const EQVisualizer: React.FC<EQVisualizerProps> = ({
@@ -21,10 +22,13 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
   disabled = false,
   onParameterChange,
   bypassed,
-  onBypassChange
+  onBypassChange,
+  analyzerNode
 }) => {
   const height = 200;
   const width = 400;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number>();
 
   const getPointPosition = (index: number, value: number) => {
     const x = (width / 3) * index;
@@ -45,6 +49,48 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
     return path;
   };
 
+  useEffect(() => {
+    if (!analyzerNode || !canvasRef.current || bypassed) return;
+
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const bufferLength = analyzerNode.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    
+    const draw = () => {
+      animationFrameRef.current = requestAnimationFrame(draw);
+      
+      analyzerNode.getByteFrequencyData(dataArray);
+      
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fillRect(0, 0, width, height);
+      
+      const barWidth = width / bufferLength * 2.5;
+      let x = 0;
+      
+      for (let i = 0; i < bufferLength; i++) {
+        const barHeight = (dataArray[i] / 255) * height;
+        
+        // Use a gradient color based on frequency
+        const hue = (i / bufferLength) * 240;
+        ctx.fillStyle = `hsla(${hue}, 100%, 50%, 0.3)`;
+        
+        ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+        x += barWidth + 1;
+      }
+    };
+
+    draw();
+
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [analyzerNode, bypassed]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -60,7 +106,13 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
       </div>
 
       <div className={`relative w-full h-[200px] bg-secondary/30 rounded-lg overflow-hidden ${disabled ? 'opacity-50' : ''}`}>
-        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <canvas
+          ref={canvasRef}
+          width={width}
+          height={height}
+          className="absolute inset-0 w-full h-full"
+        />
+        <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="relative z-10">
           {/* Grid lines */}
           {[-12, -6, 0, 6, 12].map((db) => {
             const y = height / 2 - (db * height) / 24;

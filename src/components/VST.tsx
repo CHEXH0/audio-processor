@@ -194,6 +194,7 @@ const VST = () => {
                 setEqParams(prev => ({ ...prev, [param]: value }))}
               bypassed={eqBypassed}
               onBypassChange={setEqBypassed}
+              analyzerNode={analyzerNode}
             />
           </div>
 
