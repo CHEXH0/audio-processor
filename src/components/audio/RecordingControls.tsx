@@ -29,7 +29,7 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [showFormatDialog, setShowFormatDialog] = useState(false);
-  const [processedData, setProcessedData] = useState<Float32Array | null>(null);
+  const [processedData, setProcessedData] = useState<AudioBuffer | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
@@ -38,15 +38,12 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     try {
       if (!audioContext.current || !nodes.compressor) return;
       
-      // Reset recorded chunks at the start of each recording
       recordedChunks.current = [];
       
-      // Create a new MediaStreamDestination if it doesn't exist
       if (!destination.current) {
         destination.current = audioContext.current.createMediaStreamDestination();
       }
       
-      // Connect compressor to both the recording destination and audio output
       nodes.compressor.connect(destination.current);
       nodes.compressor.connect(audioContext.current.destination);
       
@@ -62,29 +59,12 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 
       mediaRecorder.current.onstop = async () => {
         const blob = new Blob(recordedChunks.current, { type: 'audio/webm' });
-        
-        // Create a temporary audio context for processing
         const tempContext = new AudioContext();
         const arrayBuffer = await blob.arrayBuffer();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
-        
-        // Convert AudioBuffer to Float32Array
-        const numberOfChannels = audioBuffer.numberOfChannels;
-        const length = audioBuffer.length;
-        const outputArray = new Float32Array(length * numberOfChannels);
-        
-        // Interleave channels
-        for (let channel = 0; channel < numberOfChannels; channel++) {
-          const channelData = audioBuffer.getChannelData(channel);
-          for (let i = 0; i < length; i++) {
-            outputArray[i * numberOfChannels + channel] = channelData[i];
-          }
-        }
-        
-        setProcessedData(outputArray);
+        setProcessedData(audioBuffer);
         setShowFormatDialog(true);
         
-        // Restore audio routing
         if (nodes.compressor) {
           nodes.compressor.disconnect();
           nodes.compressor.connect(audioContext.current!.destination);
@@ -115,14 +95,63 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     }
   };
 
-  const handleExport = (format: 'wav' | 'mp3') => {
+  const createWavFile = (audioBuffer: AudioBuffer): Blob => {
+    const numOfChan = audioBuffer.numberOfChannels;
+    const length = audioBuffer.length * numOfChan * 2;
+    const buffer = new ArrayBuffer(44 + length);
+    const view = new DataView(buffer);
+    
+    // Write WAV header
+    const writeString = (view: DataView, offset: number, string: string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i));
+      }
+    };
+
+    writeString(view, 0, 'RIFF');
+    view.setUint32(4, 36 + length, true);
+    writeString(view, 8, 'WAVE');
+    writeString(view, 12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numOfChan, true);
+    view.setUint32(24, audioBuffer.sampleRate, true);
+    view.setUint32(28, audioBuffer.sampleRate * 2 * numOfChan, true);
+    view.setUint16(32, numOfChan * 2, true);
+    view.setUint16(34, 16, true);
+    writeString(view, 36, 'data');
+    view.setUint32(40, length, true);
+
+    // Write audio data
+    const offset = 44;
+    const channelData = new Float32Array(audioBuffer.length);
+    let index = 0;
+
+    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+      audioBuffer.copyFromChannel(channelData, i);
+      for (let j = 0; j < channelData.length; j++) {
+        const sample = Math.max(-1, Math.min(1, channelData[j]));
+        view.setInt16(offset + index, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
+        index += 2;
+      }
+    }
+
+    return new Blob([buffer], { type: 'audio/wav' });
+  };
+
+  const handleExport = async (format: 'wav' | 'mp3') => {
     if (!processedData) return;
 
-    const finalBlob = new Blob([processedData.buffer], { 
-      type: format === 'wav' ? 'audio/wav' : 'audio/mpeg' 
-    });
+    let blob: Blob;
+    if (format === 'wav') {
+      blob = createWavFile(processedData);
+    } else {
+      // For MP3, we'll use the WAV format but change the extension
+      // In a production environment, you'd want to use a proper MP3 encoder
+      blob = createWavFile(processedData);
+    }
     
-    const url = URL.createObjectURL(finalBlob);
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = `processed_audio.${format}`;
