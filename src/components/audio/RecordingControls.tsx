@@ -33,14 +33,12 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
   const recordedChunks = useRef<Blob[]>([]);
-  const startTime = useRef<number>(0);
 
   const startRecording = async () => {
     try {
       if (!audioContext.current || !nodes.compressor) return;
       
       recordedChunks.current = [];
-      startTime.current = audioContext.current.currentTime;
       
       if (!destination.current) {
         destination.current = audioContext.current.createMediaStreamDestination();
@@ -62,37 +60,11 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       };
 
       mediaRecorder.current.onstop = async () => {
-        const duration = audioContext.current!.currentTime - startTime.current;
         const blob = new Blob(recordedChunks.current, { type: 'audio/webm' });
-        
-        const tempContext = new AudioContext({
-          sampleRate: audioContext.current!.sampleRate
-        });
-        
         const arrayBuffer = await blob.arrayBuffer();
-        const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
+        const audioBuffer = await audioContext.current!.decodeAudioData(arrayBuffer);
         
-        // Create a new buffer with the exact duration
-        const newBuffer = tempContext.createBuffer(
-          audioBuffer.numberOfChannels,
-          Math.ceil(duration * tempContext.sampleRate),
-          tempContext.sampleRate
-        );
-        
-        // Copy the data maintaining the original timing
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const channelData = audioBuffer.getChannelData(channel);
-          const newChannelData = newBuffer.getChannelData(channel);
-          
-          // Calculate the correct sample position for each output sample
-          for (let i = 0; i < newBuffer.length; i++) {
-            const inputPosition = (i * audioBuffer.length) / newBuffer.length;
-            const index = Math.floor(inputPosition);
-            newChannelData[i] = channelData[index];
-          }
-        }
-        
-        setProcessedData(newBuffer);
+        setProcessedData(audioBuffer);
         setShowFormatDialog(true);
         
         if (nodes.compressor) {
@@ -152,17 +124,30 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     writeString(view, 36, 'data');
     view.setUint32(40, length, true);
 
-    const offset = 44;
-    let index = 0;
-
     // Write audio data
-    for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
-      const channelData = audioBuffer.getChannelData(i);
-      for (let j = 0; j < channelData.length; j++) {
-        const sample = Math.max(-1, Math.min(1, channelData[j]));
-        view.setInt16(offset + index, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
-        index += 2;
+    const offset = 44;
+    const channelData = new Float32Array(audioBuffer.length * numOfChan);
+    let channelIdx = 0;
+
+    // Interleave channel data
+    for (let i = 0; i < audioBuffer.length; i++) {
+      for (let channel = 0; channel < numOfChan; channel++) {
+        channelData[channelIdx++] = audioBuffer.getChannelData(channel)[i];
       }
+    }
+
+    // Convert to 16-bit PCM
+    const volume = 0.9;
+    const pcmData = new Int16Array(channelData.length);
+    for (let i = 0; i < channelData.length; i++) {
+      const s = Math.max(-1, Math.min(1, channelData[i]));
+      pcmData[i] = s < 0 ? s * 0x8000 * volume : s * 0x7FFF * volume;
+    }
+
+    // Copy PCM data to WAV buffer
+    const pcmBytes = new Uint8Array(pcmData.buffer);
+    for (let i = 0; i < pcmBytes.length; i++) {
+      view.setUint8(offset + i, pcmBytes[i]);
     }
 
     return new Blob([buffer], { type: 'audio/wav' });
