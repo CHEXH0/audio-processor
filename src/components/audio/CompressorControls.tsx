@@ -1,6 +1,6 @@
 import React from 'react';
 import { Slider } from "@/components/ui/slider";
-import { Compress } from 'lucide-react';
+import { Gauge } from 'lucide-react';
 
 interface CompressorControlsProps {
   parameters: {
@@ -21,7 +21,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-2">
-        <Compress className="w-5 h-5 text-primary" />
+        <Gauge className="w-5 h-5 text-primary" />
         <h2 className="text-lg font-medium">Compressor</h2>
       </div>
       
