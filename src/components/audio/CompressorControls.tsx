@@ -51,7 +51,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
       <div className={`grid grid-cols-2 gap-6 transition-opacity ${bypassed ? "opacity-50" : ""}`}>
         <CompressorParameter
           label="Threshold"
-          description="Determines when compression starts"
+          description="Start"
           value={parameters.threshold}
           min={-60}
           max={0}
@@ -62,7 +62,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
         />
         <CompressorParameter
           label="Ratio"
-          description="Amount of compression applied"
+          description="Amount"
           value={parameters.ratio}
           min={1}
           max={20}
@@ -73,7 +73,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
         />
         <CompressorParameter
           label="Attack"
-          description="Speed of compression onset"
+          description="Speed"
           value={parameters.attack}
           min={0}
           max={200}
@@ -84,7 +84,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
         />
         <CompressorParameter
           label="Release"
-          description="Recovery time after compression"
+          description="Recovery"
           value={parameters.release}
           min={50}
           max={1000}
