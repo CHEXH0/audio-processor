@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
+import { Slider } from "@/components/ui/slider";
 import { supabase } from "@/integrations/supabase/client";
 import EQVisualizer from './EQVisualizer';
 import TransportControls from './audio/TransportControls';
