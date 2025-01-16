@@ -54,21 +54,27 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       mediaRecorder.current.onstop = async () => {
         const blob = new Blob(recordedChunks, { type: 'audio/webm' });
         
-        // Convert to selected format before download
-        const audioElement = new Audio();
-        audioElement.src = URL.createObjectURL(blob);
+        // Create a temporary audio context for processing
+        const tempContext = new AudioContext();
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
         
-        const offlineContext = new OfflineAudioContext({
-          numberOfChannels: 2,
-          length: 44100 * audioElement.duration,
-          sampleRate: 44100,
-        });
+        // Convert AudioBuffer to Float32Array
+        const numberOfChannels = audioBuffer.numberOfChannels;
+        const length = audioBuffer.length;
+        const sampleRate = audioBuffer.sampleRate;
+        const outputArray = new Float32Array(length * numberOfChannels);
         
-        const source = offlineContext.createMediaElementSource(audioElement);
-        source.connect(offlineContext.destination);
+        // Interleave channels
+        for (let channel = 0; channel < numberOfChannels; channel++) {
+          const channelData = audioBuffer.getChannelData(channel);
+          for (let i = 0; i < length; i++) {
+            outputArray[i * numberOfChannels + channel] = channelData[i];
+          }
+        }
         
-        const renderedBuffer = await offlineContext.startRendering();
-        const finalBlob = new Blob([renderedBuffer], { 
+        // Create WAV or MP3 format blob
+        const finalBlob = new Blob([outputArray.buffer], { 
           type: exportFormat === 'wav' ? 'audio/wav' : 'audio/mpeg' 
         });
         
