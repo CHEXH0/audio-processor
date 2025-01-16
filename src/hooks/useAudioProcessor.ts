@@ -29,7 +29,7 @@ export const useAudioProcessor = () => {
   const updateProcessingConfig = (config: AudioProcessorConfig) => {
     const context = getContext();
     if (!context) {
-      console.error('Audio context not initialized');
+      console.warn('Audio context not initialized, skipping processing update');
       return;
     }
 
@@ -45,22 +45,37 @@ export const useAudioProcessor = () => {
     console.log('Initializing audio context...');
     const { context, analyzer } = initializeContext();
     
-    if (!context || !analyzer) {
-      console.error('Failed to initialize audio context or analyzer');
+    if (!context) {
+      console.error('Failed to initialize audio context');
       throw new Error('Failed to initialize audio context');
+    }
+
+    if (!analyzer) {
+      console.error('Failed to initialize analyzer');
+      throw new Error('Failed to initialize analyzer');
+    }
+
+    // Ensure context is in running state
+    if (context.state === 'suspended') {
+      try {
+        await context.resume();
+      } catch (error) {
+        console.error('Failed to resume audio context:', error);
+        throw new Error('Failed to resume audio context');
+      }
     }
 
     console.log('Setting up equalizer...');
     const eq = setupEqualizer();
     if (!eq) {
-      console.error('Failed to setup equalizer');
+      console.error('Failed to setup equalizer nodes');
       throw new Error('Failed to setup equalizer');
     }
 
     console.log('Setting up compressor...');
     const comp = setupCompressor();
     if (!comp) {
-      console.error('Failed to setup compressor');
+      console.error('Failed to setup compressor nodes');
       throw new Error('Failed to setup compressor');
     }
 
@@ -82,6 +97,11 @@ export const useAudioProcessor = () => {
   };
 
   const handlePlayAudio = async (startTime: number = 0, isLooping: boolean = false) => {
+    const context = getContext();
+    if (!context) {
+      throw new Error('Audio context not initialized');
+    }
+
     console.log('Setting up audio playback...');
     const eq = setupEqualizer();
     if (!eq) {

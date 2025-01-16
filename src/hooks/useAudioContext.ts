@@ -22,7 +22,18 @@ export const useAudioContext = () => {
         console.error('Failed to initialize audio context:', error);
         throw error;
       }
+    } else if (audioContext.current.state === 'suspended') {
+      audioContext.current.resume().catch(error => {
+        console.error('Failed to resume audio context:', error);
+        throw error;
+      });
     }
+
+    if (!analyzerNode.current) {
+      console.error('Analyzer node not initialized properly');
+      throw new Error('Failed to initialize analyzer node');
+    }
+
     return {
       context: audioContext.current,
       analyzer: analyzerNode.current
@@ -31,9 +42,9 @@ export const useAudioContext = () => {
 
   useEffect(() => {
     return () => {
-      if (audioContext.current) {
+      if (audioContext.current && audioContext.current.state !== 'closed') {
         console.log('Closing audio context...');
-        audioContext.current.close();
+        audioContext.current.close().catch(console.error);
       }
     };
   }, []);
