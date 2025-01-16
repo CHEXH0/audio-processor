@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Toggle } from "@/components/ui/toggle";
 import { Slider } from "@/components/ui/slider";
-import { ToggleLeft, ToggleRight } from "lucide-react";
+import { ToggleLeft, ToggleRight, SlidersHorizontal, Equalizer } from "lucide-react";
 
 interface EQVisualizerProps {
   parameters: {
@@ -73,7 +73,6 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
       for (let i = 0; i < bufferLength; i++) {
         const barHeight = (dataArray[i] / 255) * height;
         
-        // Use a gradient color based on frequency
         const hue = (i / bufferLength) * 240;
         ctx.fillStyle = `hsla(${hue}, 100%, 50%, 0.3)`;
         
@@ -94,7 +93,10 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-medium">Equalizer</h2>
+        <div className="flex items-center gap-2">
+          <Equalizer className="h-5 w-5" />
+          <h2 className="text-xl font-medium">Equalizer</h2>
+        </div>
         <Toggle 
           pressed={!bypassed}
           onPressedChange={(pressed) => onBypassChange(!pressed)}
@@ -169,9 +171,12 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
       <div className="grid grid-cols-2 gap-6">
         {Object.entries(parameters).map(([band, value]) => (
           <div key={band} className="space-y-2">
-            <label className="parameter-label">
-              {band.replace(/([A-Z])/g, ' $1').trim()}
-            </label>
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              <label className="parameter-label">
+                {band.replace(/([A-Z])/g, ' $1').trim()}
+              </label>
+            </div>
             <Slider
               value={[value]}
               min={-12}
