@@ -18,6 +18,7 @@ const VST = () => {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioFile, setAudioFile] = useState<File | null>(null);
+  const playbackTimer = useRef<number | null>(null);
 
   const [eqParams, setEqParams] = useState({
     low: 0,
@@ -36,9 +37,45 @@ const VST = () => {
   useEffect(() => {
     audioContext.current = new AudioContext();
     return () => {
+      if (playbackTimer.current) {
+        cancelAnimationFrame(playbackTimer.current);
+      }
       audioContext.current?.close();
     };
   }, []);
+
+  // Update timer during playback
+  useEffect(() => {
+    const updatePlaybackTime = () => {
+      if (isPlaying && audioContext.current) {
+        setCurrentTime(prev => {
+          const newTime = prev + audioContext.current!.currentTime - (audioContext.current!.currentTime | 0);
+          if (newTime >= duration) {
+            if (isLooping) {
+              return 0;
+            } else {
+              setIsPlaying(false);
+              return duration;
+            }
+          }
+          return newTime;
+        });
+        playbackTimer.current = requestAnimationFrame(updatePlaybackTime);
+      }
+    };
+
+    if (isPlaying) {
+      playbackTimer.current = requestAnimationFrame(updatePlaybackTime);
+    } else if (playbackTimer.current) {
+      cancelAnimationFrame(playbackTimer.current);
+    }
+
+    return () => {
+      if (playbackTimer.current) {
+        cancelAnimationFrame(playbackTimer.current);
+      }
+    };
+  }, [isPlaying, duration, isLooping]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -49,6 +86,7 @@ const VST = () => {
       const buffer = await audioContext.current!.decodeAudioData(arrayBuffer);
       audioBuffer.current = buffer;
       setDuration(buffer.duration);
+      setCurrentTime(0);
       setAudioFile(file);
       toast({
         title: "Audio loaded",
@@ -77,6 +115,26 @@ const VST = () => {
       audioSource.current.start(0, currentTime);
       setIsPlaying(true);
     }
+  };
+
+  const handleSeek = (time: number) => {
+    setCurrentTime(time);
+    if (isPlaying) {
+      audioSource.current?.stop();
+      audioSource.current = audioContext.current!.createBufferSource();
+      audioSource.current.buffer = audioBuffer.current;
+      audioSource.current.loop = isLooping;
+      audioSource.current.connect(audioContext.current!.destination);
+      audioSource.current.start(0, time);
+    }
+  };
+
+  const handleRewind = () => {
+    if (audioSource.current && isPlaying) {
+      audioSource.current.stop();
+    }
+    setCurrentTime(0);
+    setIsPlaying(false);
   };
 
   const handleExport = async (format: 'wav' | 'mp3') => {
@@ -154,24 +212,8 @@ const VST = () => {
             duration={duration}
             onPlayPause={handlePlayPause}
             onLoopToggle={() => setIsLooping(!isLooping)}
-            onSeek={(time) => {
-              setCurrentTime(time);
-              if (audioSource.current && isPlaying) {
-                audioSource.current.stop();
-                audioSource.current = audioContext.current!.createBufferSource();
-                audioSource.current.buffer = audioBuffer.current;
-                audioSource.current.loop = isLooping;
-                audioSource.current.connect(audioContext.current!.destination);
-                audioSource.current.start(0, time);
-              }
-            }}
-            onRewind={() => {
-              setCurrentTime(0);
-              if (audioSource.current) {
-                audioSource.current.stop();
-                setIsPlaying(false);
-              }
-            }}
+            onSeek={handleSeek}
+            onRewind={handleRewind}
           />
         </div>
 
