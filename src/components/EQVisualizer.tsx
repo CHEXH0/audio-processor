@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Toggle } from "@/components/ui/toggle";
 import { Slider } from "@/components/ui/slider";
-import { ToggleLeft, ToggleRight, SlidersHorizontal, Equalizer } from "lucide-react";
+import { ToggleLeft, ToggleRight, SlidersHorizontal, Waveform } from "lucide-react";
 
 interface EQVisualizerProps {
   parameters: {
@@ -94,7 +94,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Equalizer className="h-5 w-5" />
+          <Waveform className="h-5 w-5" />
           <h2 className="text-xl font-medium">Equalizer</h2>
         </div>
         <Toggle 
