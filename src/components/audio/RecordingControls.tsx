@@ -2,6 +2,16 @@ import React, { useRef, useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Mic } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 interface RecordingControlsProps {
   audioContext: React.MutableRefObject<AudioContext | null>;
@@ -23,6 +33,8 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
   const [recordedChunks, setRecordedChunks] = useState<Blob[]>([]);
+  const [showFormatDialog, setShowFormatDialog] = useState(false);
+  const [processedData, setProcessedData] = useState<Float32Array | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
 
   const startRecording = async () => {
@@ -53,7 +65,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         // Convert AudioBuffer to Float32Array
         const numberOfChannels = audioBuffer.numberOfChannels;
         const length = audioBuffer.length;
-        const sampleRate = audioBuffer.sampleRate;
         const outputArray = new Float32Array(length * numberOfChannels);
         
         // Interleave channels
@@ -64,17 +75,8 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
           }
         }
         
-        // Create WAV format blob
-        const finalBlob = new Blob([outputArray.buffer], { type: 'audio/wav' });
-        
-        const url = URL.createObjectURL(finalBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'processed_audio.wav';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setProcessedData(outputArray);
+        setShowFormatDialog(true);
         setRecordedChunks([]);
       };
 
@@ -103,24 +105,66 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     if (mediaRecorder.current && mediaRecorder.current.state !== 'inactive') {
       mediaRecorder.current.stop();
       setIsRecording(false);
-      toast({
-        title: "Recording complete",
-        description: "Your processed audio is ready for download",
-      });
     }
   };
 
+  const handleExport = (format: 'wav' | 'mp3') => {
+    if (!processedData) return;
+
+    const finalBlob = new Blob([processedData.buffer], { 
+      type: format === 'wav' ? 'audio/wav' : 'audio/mpeg' 
+    });
+    
+    const url = URL.createObjectURL(finalBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `processed_audio.${format}`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    setShowFormatDialog(false);
+    setProcessedData(null);
+
+    toast({
+      title: "Export complete",
+      description: `Your processed audio has been exported as ${format.toUpperCase()}`,
+    });
+  };
+
   return (
-    <div className="flex gap-4 items-center">
-      <Button
-        variant={isRecording ? "destructive" : "default"}
-        onClick={isRecording ? stopRecording : startRecording}
-        disabled={!hasAudioFile}
-      >
-        <Mic className="h-4 w-4 mr-2" />
-        {isRecording ? "Stop Recording" : "Record Processing"}
-      </Button>
-    </div>
+    <>
+      <div className="flex gap-4 items-center">
+        <Button
+          variant={isRecording ? "destructive" : "default"}
+          onClick={isRecording ? stopRecording : startRecording}
+          disabled={!hasAudioFile}
+        >
+          <Mic className="h-4 w-4 mr-2" />
+          {isRecording ? "Stop Recording" : "Record Processing"}
+        </Button>
+      </div>
+
+      <AlertDialog open={showFormatDialog} onOpenChange={setShowFormatDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Choose Export Format</AlertDialogTitle>
+            <AlertDialogDescription>
+              Select the format you want to export your processed audio in.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex gap-2">
+            <AlertDialogAction onClick={() => handleExport('wav')}>
+              Export as WAV
+            </AlertDialogAction>
+            <AlertDialogAction onClick={() => handleExport('mp3')}>
+              Export as MP3
+            </AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 };
 
