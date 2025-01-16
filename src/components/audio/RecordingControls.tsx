@@ -37,14 +37,10 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const [processedData, setProcessedData] = useState<Float32Array | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
   const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
-  const originalDestination = useRef<AudioNode | null>(null);
 
   const startRecording = async () => {
     try {
       if (!audioContext.current || !nodes.compressor) return;
-      
-      // Store the original destination connection
-      originalDestination.current = nodes.compressor.destination;
       
       // Create a new MediaStreamDestination if it doesn't exist
       if (!destination.current) {
@@ -93,10 +89,10 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         setShowFormatDialog(true);
         setRecordedChunks([]);
         
-        // Restore original audio routing
-        if (nodes.compressor && originalDestination.current) {
+        // Restore audio routing
+        if (nodes.compressor) {
           nodes.compressor.disconnect();
-          nodes.compressor.connect(originalDestination.current);
+          nodes.compressor.connect(audioContext.current!.destination);
         }
       };
 
