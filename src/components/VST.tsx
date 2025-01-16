@@ -9,6 +9,7 @@ import { useSession } from '@supabase/auth-helpers-react';
 import { useAudioContext } from '@/hooks/useAudioContext';
 import { usePlayback } from '@/hooks/usePlayback';
 import { useAudioProcessor } from '@/hooks/useAudioProcessor';
+import { useState } from 'react';
 
 const VST = () => {
   const { toast } = useToast();
