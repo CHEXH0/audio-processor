@@ -59,7 +59,9 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 
       mediaRecorder.current.onstop = async () => {
         const blob = new Blob(recordedChunks.current, { type: 'audio/webm' });
-        const tempContext = new AudioContext();
+        const tempContext = new AudioContext({
+          sampleRate: audioContext.current!.sampleRate // Match original context sample rate
+        });
         const arrayBuffer = await blob.arrayBuffer();
         const audioBuffer = await tempContext.decodeAudioData(arrayBuffer);
         setProcessedData(audioBuffer);
@@ -97,17 +99,18 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 
   const createWavFile = (audioBuffer: AudioBuffer): Blob => {
     const numOfChan = audioBuffer.numberOfChannels;
+    const sampleRate = audioBuffer.sampleRate;
     const length = audioBuffer.length * numOfChan * 2;
     const buffer = new ArrayBuffer(44 + length);
     const view = new DataView(buffer);
     
-    // Write WAV header
     const writeString = (view: DataView, offset: number, string: string) => {
       for (let i = 0; i < string.length; i++) {
         view.setUint8(offset + i, string.charCodeAt(i));
       }
     };
 
+    // Write WAV header with correct sample rate
     writeString(view, 0, 'RIFF');
     view.setUint32(4, 36 + length, true);
     writeString(view, 8, 'WAVE');
@@ -115,20 +118,21 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
     view.setUint32(16, 16, true);
     view.setUint16(20, 1, true);
     view.setUint16(22, numOfChan, true);
-    view.setUint32(24, audioBuffer.sampleRate, true);
-    view.setUint32(28, audioBuffer.sampleRate * 2 * numOfChan, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numOfChan * 2, true); // Bytes per second
     view.setUint16(32, numOfChan * 2, true);
     view.setUint16(34, 16, true);
     writeString(view, 36, 'data');
     view.setUint32(40, length, true);
 
-    // Write audio data
+    // Write audio data maintaining original timing
     const offset = 44;
-    const channelData = new Float32Array(audioBuffer.length);
     let index = 0;
 
     for (let i = 0; i < audioBuffer.numberOfChannels; i++) {
+      const channelData = new Float32Array(audioBuffer.length);
       audioBuffer.copyFromChannel(channelData, i);
+      
       for (let j = 0; j < channelData.length; j++) {
         const sample = Math.max(-1, Math.min(1, channelData[j]));
         view.setInt16(offset + index, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
@@ -147,7 +151,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       blob = createWavFile(processedData);
     } else {
       // For MP3, we'll use the WAV format but change the extension
-      // In a production environment, you'd want to use a proper MP3 encoder
       blob = createWavFile(processedData);
     }
     
