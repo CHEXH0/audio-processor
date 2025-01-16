@@ -1,19 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Slider } from "@/components/ui/slider";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
-import { 
-  Play, 
-  Pause, 
-  SkipBack, 
-  Download,
-  Upload,
-  RotateCw
-} from "lucide-react";
-import EQVisualizer from './EQVisualizer';
 import { Card } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
+import EQVisualizer from './EQVisualizer';
+import TransportControls from './audio/TransportControls';
+import FileControls from './audio/FileControls';
+import CompressorControls from './audio/CompressorControls';
 
 const VST = () => {
   const { toast } = useToast();
@@ -153,95 +145,42 @@ const VST = () => {
         <h1 className="text-2xl font-semibold mb-8">Audio Processor</h1>
         
         {/* Transport Controls */}
-        <div className="mb-8 space-y-4">
-          <div className="flex items-center gap-4">
-            <Input
-              type="file"
-              accept="audio/*"
-              onChange={handleFileChange}
-              className="max-w-xs"
-            />
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => setIsLooping(!isLooping)}
-              className={isLooping ? "bg-primary/20" : ""}
-            >
-              <RotateCw className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => {
-                setCurrentTime(0);
-                if (audioSource.current) {
-                  audioSource.current.stop();
-                  setIsPlaying(false);
-                }
-              }}
-            >
-              <SkipBack className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={handlePlayPause}
-            >
-              {isPlaying ? (
-                <Pause className="h-4 w-4" />
-              ) : (
-                <Play className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+        <div className="mb-8">
+          <TransportControls
+            isPlaying={isPlaying}
+            isLooping={isLooping}
+            currentTime={currentTime}
+            duration={duration}
+            onPlayPause={handlePlayPause}
+            onLoopToggle={() => setIsLooping(!isLooping)}
+            onSeek={(time) => {
+              setCurrentTime(time);
+              if (audioSource.current && isPlaying) {
+                audioSource.current.stop();
+                audioSource.current = audioContext.current!.createBufferSource();
+                audioSource.current.buffer = audioBuffer.current;
+                audioSource.current.loop = isLooping;
+                audioSource.current.connect(audioContext.current!.destination);
+                audioSource.current.start(0, time);
+              }
+            }}
+            onRewind={() => {
+              setCurrentTime(0);
+              if (audioSource.current) {
+                audioSource.current.stop();
+                setIsPlaying(false);
+              }
+            }}
+          />
+        </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm">
-              {Math.floor(currentTime / 60)}:
-              {Math.floor(currentTime % 60).toString().padStart(2, '0')}
-            </span>
-            <Slider
-              value={[currentTime]}
-              min={0}
-              max={duration}
-              step={0.1}
-              className="flex-1"
-              onValueChange={([value]) => {
-                setCurrentTime(value);
-                if (audioSource.current && isPlaying) {
-                  audioSource.current.stop();
-                  audioSource.current = audioContext.current!.createBufferSource();
-                  audioSource.current.buffer = audioBuffer.current;
-                  audioSource.current.loop = isLooping;
-                  audioSource.current.connect(audioContext.current!.destination);
-                  audioSource.current.start(0, value);
-                }
-              }}
-            />
-            <span className="text-sm">
-              {Math.floor(duration / 60)}:
-              {Math.floor(duration % 60).toString().padStart(2, '0')}
-            </span>
-          </div>
-
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => handleExport('wav')}
-              disabled={!audioFile}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export WAV
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => handleExport('mp3')}
-              disabled={!audioFile}
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Export MP3
-            </Button>
-          </div>
+        {/* File Controls */}
+        <div className="mb-8">
+          <FileControls
+            onFileChange={handleFileChange}
+            onExport={handleExport}
+            hasAudioFile={!!audioFile}
+          />
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -271,99 +210,11 @@ const VST = () => {
           </div>
 
           {/* Compressor Section */}
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">Compressor</h2>
-            
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <label className="parameter-label">Threshold</label>
-                <Slider
-                  value={[compParams.threshold]}
-                  min={-60}
-                  max={0}
-                  step={0.1}
-                  className="parameter-change"
-                  onValueChange={([v]) => handleCompChange('threshold', v)}
-                />
-                <span className="parameter-value">
-                  {compParams.threshold.toFixed(1)} dB
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <label className="parameter-label">Ratio</label>
-                <Slider
-                  value={[compParams.ratio]}
-                  min={1}
-                  max={20}
-                  step={0.1}
-                  className="parameter-change"
-                  onValueChange={([v]) => handleCompChange('ratio', v)}
-                />
-                <span className="parameter-value">
-                  {compParams.ratio.toFixed(1)}:1
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                <label className="parameter-label">Attack</label>
-                <Slider
-                  value={[compParams.attack]}
-                  min={0}
-                  max={200}
-                  step={1}
-                  className="parameter-change"
-                  onValueChange={([v]) => handleCompChange('attack', v)}
-                />
-                <span className="parameter-value">{compParams.attack} ms</span>
-              </div>
-
-              <div className="space-y-2">
-                <label className="parameter-label">Release</label>
-                <Slider
-                  value={[compParams.release]}
-                  min={50}
-                  max={1000}
-                  step={1}
-                  className="parameter-change"
-                  onValueChange={([v]) => handleCompChange('release', v)}
-                />
-                <span className="parameter-value">{compParams.release} ms</span>
-              </div>
-            </div>
-
-            {/* Meters */}
-            <div className="flex justify-between items-end h-40 mt-8">
-              <div className="flex gap-2">
-                <div className="meter-container">
-                  <div 
-                    className="meter-bar bg-primary/80 w-full transition-all duration-100"
-                    style={{
-                      height: `${Math.max(0, Math.min(100, 
-                        isPlaying ? 60 - (compParams.threshold * -1) : 0
-                      ))}%`
-                    }}
-                  />
-                </div>
-                <div className="meter-container">
-                  <div 
-                    className="meter-bar bg-primary/80 w-full transition-all duration-100"
-                    style={{
-                      height: `${Math.max(0, Math.min(100, 
-                        isPlaying ? 40 - (compParams.threshold * -1) : 0
-                      ))}%`
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground space-y-2">
-                <div>0 dB</div>
-                <div>-6</div>
-                <div>-12</div>
-                <div>-24</div>
-              </div>
-            </div>
-          </div>
+          <CompressorControls
+            parameters={compParams}
+            onParameterChange={handleCompChange}
+            isPlaying={isPlaying}
+          />
         </div>
       </Card>
     </div>
