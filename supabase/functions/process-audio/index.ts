@@ -1,5 +1,5 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,80 +7,72 @@ const corsHeaders = {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
     const formData = await req.formData()
-    const audioFile = formData.get('file')
-    const settings = formData.get('settings')
+    const file = formData.get('file') as File
+    const settings = JSON.parse(formData.get('settings') as string)
 
-    if (!audioFile) {
-      return new Response(
-        JSON.stringify({ error: 'No audio file uploaded' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
-      )
-    }
-
+    // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    const fileName = audioFile.name.replace(/[^\x00-\x7F]/g, '')
-    const fileExt = fileName.split('.').pop()
-    const filePath = `${crypto.randomUUID()}.${fileExt}`
-
-    // Upload the original file
+    // Upload original file to storage
+    const timestamp = new Date().getTime()
+    const filePath = `processed/${timestamp}_${file.name}`
+    
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio_files')
-      .upload(filePath, audioFile, {
-        contentType: audioFile.type,
-        upsert: false
-      })
+      .upload(filePath, file)
 
-    if (uploadError) {
-      console.error('Upload error:', uploadError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to upload file', details: uploadError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
-    }
+    if (uploadError) throw uploadError
 
-    // Create audio track record
+    // In a real implementation, you would process the audio file here
+    // For now, we're just storing the original file
+    
+    // Store the track information
     const { data: trackData, error: trackError } = await supabase
       .from('audio_tracks')
       .insert({
-        title: fileName,
         file_path: filePath,
-        eq_settings: settings ? JSON.parse(settings).eq : null,
-        comp_settings: settings ? JSON.parse(settings).comp : null,
+        title: file.name,
+        eq_settings: settings.eq,
+        comp_settings: settings.comp
       })
       .select()
       .single()
 
-    if (trackError) {
-      console.error('Track creation error:', trackError)
-      return new Response(
-        JSON.stringify({ error: 'Failed to create track record', details: trackError }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-      )
-    }
+    if (trackError) throw trackError
 
     return new Response(
-      JSON.stringify({ 
-        message: 'Audio file processed successfully',
-        track: trackData,
-        file: uploadData
+      JSON.stringify({
+        message: 'Audio processed successfully',
+        file: uploadData,
+        track: trackData
       }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
     )
   } catch (error) {
-    console.error('Unexpected error:', error)
     return new Response(
-      JSON.stringify({ error: 'An unexpected error occurred', details: error.message }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      JSON.stringify({ error: error.message }),
+      {
+        status: 400,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
     )
   }
 })

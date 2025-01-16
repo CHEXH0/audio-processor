@@ -9,6 +9,42 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      audio_tracks: {
+        Row: {
+          comp_settings: Json | null
+          created_at: string
+          duration: number | null
+          eq_settings: Json | null
+          file_path: string
+          id: string
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          comp_settings?: Json | null
+          created_at?: string
+          duration?: number | null
+          eq_settings?: Json | null
+          file_path: string
+          id?: string
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          comp_settings?: Json | null
+          created_at?: string
+          duration?: number | null
+          eq_settings?: Json | null
+          file_path?: string
+          id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       order_items: {
         Row: {
           created_at: string | null
