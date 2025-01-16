@@ -36,15 +36,25 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [processedData, setProcessedData] = useState<Float32Array | null>(null);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
+  const destination = useRef<MediaStreamAudioDestinationNode | null>(null);
 
   const startRecording = async () => {
     try {
       if (!audioContext.current) return;
       
-      const destination = audioContext.current.createMediaStreamDestination();
-      nodes.compressor?.connect(destination);
+      // Create a new MediaStreamDestination if it doesn't exist
+      if (!destination.current) {
+        destination.current = audioContext.current.createMediaStreamDestination();
+      }
       
-      mediaRecorder.current = new MediaRecorder(destination.stream, {
+      // Ensure compressor is connected to the destination
+      if (nodes.compressor && destination.current) {
+        nodes.compressor.disconnect();
+        nodes.compressor.connect(destination.current);
+        nodes.compressor.connect(audioContext.current.destination);
+      }
+      
+      mediaRecorder.current = new MediaRecorder(destination.current.stream, {
         mimeType: 'audio/webm;codecs=opus'
       });
       
