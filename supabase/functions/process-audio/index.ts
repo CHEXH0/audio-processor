@@ -13,51 +13,59 @@ serve(async (req) => {
   }
 
   try {
-    const formData = await req.formData()
-    const file = formData.get('file') as File
-    const settings = JSON.parse(formData.get('settings') as string)
-
     // Create Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get the user ID from the authorization header
-    const authHeader = req.headers.get('authorization')?.split('Bearer ')[1]
+    // Get the session from the request headers
+    const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
       throw new Error('No authorization header')
     }
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader)
+    // Verify the user's session
+    const { data: { user }, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''))
     if (userError || !user) {
+      console.error('User verification error:', userError)
       throw new Error('Invalid user token')
     }
 
+    const formData = await req.formData()
+    const file = formData.get('file') as File
+    const settings = JSON.parse(formData.get('settings') as string)
+
     // Upload original file to storage
     const timestamp = new Date().getTime()
-    const filePath = `processed/${timestamp}_${file.name}`
+    const filePath = `processed/${user.id}/${timestamp}_${file.name}`
     
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('audio_files')
       .upload(filePath, file)
 
-    if (uploadError) throw uploadError
+    if (uploadError) {
+      console.error('Upload error:', uploadError)
+      throw uploadError
+    }
 
-    // Store the track information with user_id
+    // Store the track information
     const { data: trackData, error: trackError } = await supabase
       .from('audio_tracks')
       .insert({
-        file_path: filePath,
+        user_id: user.id,
         title: file.name,
+        file_path: filePath,
         eq_settings: settings.eq,
-        comp_settings: settings.comp,
-        user_id: user.id // Set the user_id from the authenticated user
+        comp_settings: settings.comp
       })
       .select()
       .single()
 
-    if (trackError) throw trackError
+    if (trackError) {
+      console.error('Track creation error:', trackError)
+      throw trackError
+    }
 
     return new Response(
       JSON.stringify({

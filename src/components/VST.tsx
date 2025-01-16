@@ -7,9 +7,11 @@ import EQVisualizer from './EQVisualizer';
 import TransportControls from './audio/TransportControls';
 import FileControls from './audio/FileControls';
 import CompressorControls from './audio/CompressorControls';
+import { useSession } from '@supabase/auth-helpers-react';
 
 const VST = () => {
   const { toast } = useToast();
+  const session = useSession();
   const audioContext = useRef<AudioContext | null>(null);
   const audioSource = useRef<AudioBufferSourceNode | null>(null);
   const audioBuffer = useRef<AudioBuffer | null>(null);
@@ -210,6 +212,15 @@ const VST = () => {
       return;
     }
 
+    if (!session) {
+      toast({
+        title: "Error",
+        description: "Please sign in to export audio",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       const formData = new FormData();
       formData.append('file', audioFile);
@@ -220,6 +231,9 @@ const VST = () => {
 
       const { data, error } = await supabase.functions.invoke('process-audio', {
         body: formData,
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
       });
 
       if (error) throw error;
