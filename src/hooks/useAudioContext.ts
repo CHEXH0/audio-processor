@@ -12,8 +12,6 @@ export const useAudioContext = () => {
           sampleRate: 48000,
           latencyHint: 'interactive'
         });
-      } else if (audioContext.current.state === 'suspended') {
-        audioContext.current.resume();
       }
 
       if (!analyzerNode.current && audioContext.current) {
