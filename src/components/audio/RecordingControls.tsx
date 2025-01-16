@@ -19,16 +19,12 @@ interface RecordingControlsProps {
     compressor: DynamicsCompressorNode | null;
   };
   hasAudioFile: boolean;
-  isPlaying: boolean;
-  onPlaybackStart: () => void;
 }
 
 const RecordingControls: React.FC<RecordingControlsProps> = ({
   audioContext,
   nodes,
   hasAudioFile,
-  isPlaying,
-  onPlaybackStart,
 }) => {
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
@@ -46,9 +42,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       if (!destination.current) {
         destination.current = audioContext.current.createMediaStreamDestination();
       }
-      
-      // Disconnect compressor from its current destinations
-      nodes.compressor.disconnect();
       
       // Connect compressor to both the recording destination and audio output
       nodes.compressor.connect(destination.current);
@@ -98,10 +91,6 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
 
       mediaRecorder.current.start();
       setIsRecording(true);
-      
-      if (!isPlaying) {
-        onPlaybackStart();
-      }
       
       toast({
         title: "Recording started",
