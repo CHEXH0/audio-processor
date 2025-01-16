@@ -1,7 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Slider } from "@/components/ui/slider";
-import { Toggle } from "@/components/ui/toggle";
-import { ToggleLeft, ToggleRight, Activity } from "lucide-react";
 
 interface CompressorControlsProps {
   parameters: {
@@ -12,106 +10,17 @@ interface CompressorControlsProps {
   };
   onParameterChange: (param: string, value: number) => void;
   isPlaying: boolean;
-  bypassed: boolean;
-  onBypassChange: (bypassed: boolean) => void;
-  analyzerNode: AnalyserNode | null;
 }
 
 const CompressorControls: React.FC<CompressorControlsProps> = ({
   parameters,
   onParameterChange,
   isPlaying,
-  bypassed,
-  onBypassChange,
-  analyzerNode
 }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const animationFrame = useRef<number>();
-
-  useEffect(() => {
-    if (!analyzerNode || !canvasRef.current || !isPlaying) return;
-
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const bufferLength = analyzerNode.frequencyBinCount;
-    const dataArray = new Uint8Array(bufferLength);
-
-    const draw = () => {
-      animationFrame.current = requestAnimationFrame(draw);
-      analyzerNode.getByteTimeDomainData(dataArray);
-
-      ctx.fillStyle = 'rgb(20, 20, 20)';
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = bypassed ? 'rgb(100, 100, 100)' : 'rgb(0, 255, 0)';
-      ctx.beginPath();
-
-      const sliceWidth = canvas.width * 1.0 / bufferLength;
-      let x = 0;
-
-      for (let i = 0; i < bufferLength; i++) {
-        const v = dataArray[i] / 128.0;
-        const y = v * canvas.height / 2;
-
-        if (i === 0) {
-          ctx.moveTo(x, y);
-        } else {
-          ctx.lineTo(x, y);
-        }
-
-        x += sliceWidth;
-      }
-
-      ctx.lineTo(canvas.width, canvas.height / 2);
-      ctx.stroke();
-
-      // Draw threshold line
-      const thresholdY = (1 - (parameters.threshold + 60) / 60) * canvas.height;
-      ctx.beginPath();
-      ctx.strokeStyle = 'rgb(255, 0, 0)';
-      ctx.setLineDash([5, 5]);
-      ctx.moveTo(0, thresholdY);
-      ctx.lineTo(canvas.width, thresholdY);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    };
-
-    draw();
-
-    return () => {
-      if (animationFrame.current) {
-        cancelAnimationFrame(animationFrame.current);
-      }
-    };
-  }, [isPlaying, analyzerNode, parameters.threshold, bypassed]);
-
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-medium">Compressor</h2>
-        <Toggle 
-          pressed={!bypassed}
-          onPressedChange={(pressed) => onBypassChange(!pressed)}
-          className={`transition-opacity ${bypassed ? 'opacity-50' : ''}`}
-        >
-          {bypassed ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
-          {bypassed ? 'Bypassed' : 'Active'}
-        </Toggle>
-      </div>
+      <h2 className="text-xl font-medium">Compressor</h2>
       
-      <div className="relative">
-        <canvas 
-          ref={canvasRef} 
-          width="400" 
-          height="200" 
-          className="w-full bg-secondary/30 rounded-lg"
-        />
-        <Activity className={`absolute top-2 right-2 h-4 w-4 ${isPlaying ? 'text-primary' : 'text-muted-foreground'}`} />
-      </div>
-
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-2">
           <label className="parameter-label">Threshold</label>
@@ -120,8 +29,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
             min={-60}
             max={0}
             step={0.1}
-            className={`parameter-change ${bypassed ? 'opacity-50' : ''}`}
-            disabled={bypassed}
+            className="parameter-change"
             onValueChange={([v]) => onParameterChange('threshold', v)}
           />
           <span className="parameter-value">
@@ -136,8 +44,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
             min={1}
             max={20}
             step={0.1}
-            className={`parameter-change ${bypassed ? 'opacity-50' : ''}`}
-            disabled={bypassed}
+            className="parameter-change"
             onValueChange={([v]) => onParameterChange('ratio', v)}
           />
           <span className="parameter-value">
@@ -152,8 +59,7 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
             min={0}
             max={200}
             step={1}
-            className={`parameter-change ${bypassed ? 'opacity-50' : ''}`}
-            disabled={bypassed}
+            className="parameter-change"
             onValueChange={([v]) => onParameterChange('attack', v)}
           />
           <span className="parameter-value">{parameters.attack} ms</span>
@@ -166,11 +72,42 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
             min={50}
             max={1000}
             step={1}
-            className={`parameter-change ${bypassed ? 'opacity-50' : ''}`}
-            disabled={bypassed}
+            className="parameter-change"
             onValueChange={([v]) => onParameterChange('release', v)}
           />
           <span className="parameter-value">{parameters.release} ms</span>
+        </div>
+      </div>
+
+      {/* Meters */}
+      <div className="flex justify-between items-end h-40 mt-8">
+        <div className="flex gap-2">
+          <div className="meter-container">
+            <div 
+              className="meter-bar bg-primary/80 w-full transition-all duration-100"
+              style={{
+                height: `${Math.max(0, Math.min(100, 
+                  isPlaying ? 60 - (parameters.threshold * -1) : 0
+                ))}%`
+              }}
+            />
+          </div>
+          <div className="meter-container">
+            <div 
+              className="meter-bar bg-primary/80 w-full transition-all duration-100"
+              style={{
+                height: `${Math.max(0, Math.min(100, 
+                  isPlaying ? 40 - (parameters.threshold * -1) : 0
+                ))}%`
+              }}
+            />
+          </div>
+        </div>
+        <div className="text-xs text-muted-foreground space-y-2">
+          <div>0 dB</div>
+          <div>-6</div>
+          <div>-12</div>
+          <div>-24</div>
         </div>
       </div>
     </div>
