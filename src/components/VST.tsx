@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useToast } from "@/components/ui/use-toast";
 import { Card } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
+import { Toggle } from "@/components/ui/toggle";
 import { supabase } from "@/integrations/supabase/client";
+import { ToggleLeft, ToggleRight, Activity } from "lucide-react";
 import EQVisualizer from './EQVisualizer';
 import TransportControls from './audio/TransportControls';
 import FileControls from './audio/FileControls';
@@ -19,6 +21,11 @@ const VST = () => {
   const [duration, setDuration] = useState(0);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const playbackTimer = useRef<number | null>(null);
+  const analyzerNode = useRef<AnalyserNode | null>(null);
+
+  // Bypass states
+  const [eqBypassed, setEqBypassed] = useState(false);
+  const [compBypassed, setCompBypassed] = useState(false);
 
   // Audio processing nodes
   const lowFilter = useRef<BiquadFilterNode | null>(null);
@@ -26,6 +33,10 @@ const VST = () => {
   const highMidFilter = useRef<BiquadFilterNode | null>(null);
   const highFilter = useRef<BiquadFilterNode | null>(null);
   const compressor = useRef<DynamicsCompressorNode | null>(null);
+  const eqInputGain = useRef<GainNode | null>(null);
+  const eqOutputGain = useRef<GainNode | null>(null);
+  const compInputGain = useRef<GainNode | null>(null);
+  const compOutputGain = useRef<GainNode | null>(null);
 
   const [eqParams, setEqParams] = useState({
     low: 0,
@@ -44,6 +55,16 @@ const VST = () => {
   // Initialize audio context and nodes
   useEffect(() => {
     audioContext.current = new AudioContext();
+    
+    // Create analyzer
+    analyzerNode.current = audioContext.current.createAnalyser();
+    analyzerNode.current.fftSize = 2048;
+
+    // Create gain nodes for bypass
+    eqInputGain.current = audioContext.current.createGain();
+    eqOutputGain.current = audioContext.current.createGain();
+    compInputGain.current = audioContext.current.createGain();
+    compOutputGain.current = audioContext.current.createGain();
     
     // Create filters
     lowFilter.current = audioContext.current.createBiquadFilter();
@@ -67,12 +88,27 @@ const VST = () => {
     // Create compressor
     compressor.current = audioContext.current.createDynamicsCompressor();
 
-    // Connect nodes
-    lowFilter.current
-      .connect(lowMidFilter.current)
-      .connect(highMidFilter.current)
-      .connect(highFilter.current)
-      .connect(compressor.current)
+    // Connect nodes with bypass options
+    eqInputGain.current
+      .connect(lowFilter.current!)
+      .connect(lowMidFilter.current!)
+      .connect(highMidFilter.current!)
+      .connect(highFilter.current!)
+      .connect(eqOutputGain.current!);
+
+    eqInputGain.current.connect(eqOutputGain.current!);  // Bypass path
+
+    eqOutputGain.current!
+      .connect(compInputGain.current!);
+
+    compInputGain.current!
+      .connect(compressor.current!)
+      .connect(compOutputGain.current!);
+
+    compInputGain.current!.connect(compOutputGain.current!);  // Bypass path
+
+    compOutputGain.current!
+      .connect(analyzerNode.current!)
       .connect(audioContext.current.destination);
 
     return () => {
@@ -83,59 +119,32 @@ const VST = () => {
     };
   }, []);
 
-  // Update EQ parameters
+  // Handle bypass states
   useEffect(() => {
-    if (!audioContext.current) return;
+    if (!eqInputGain.current || !eqOutputGain.current) return;
+    
+    // When bypassed, set the direct path to full volume and processing path to zero
+    eqInputGain.current.connect(eqOutputGain.current);
+    eqInputGain.current.gain.value = eqBypassed ? 1 : 0;
+    lowFilter.current!.gain.value = eqBypassed ? 0 : eqParams.low;
+    lowMidFilter.current!.gain.value = eqBypassed ? 0 : eqParams.lowMid;
+    highMidFilter.current!.gain.value = eqBypassed ? 0 : eqParams.highMid;
+    highFilter.current!.gain.value = eqBypassed ? 0 : eqParams.high;
+  }, [eqBypassed, eqParams]);
 
-    lowFilter.current!.gain.value = eqParams.low;
-    lowMidFilter.current!.gain.value = eqParams.lowMid;
-    highMidFilter.current!.gain.value = eqParams.highMid;
-    highFilter.current!.gain.value = eqParams.high;
-  }, [eqParams]);
-
-  // Update compressor parameters
   useEffect(() => {
-    if (!compressor.current) return;
-
-    compressor.current.threshold.value = compParams.threshold;
-    compressor.current.ratio.value = compParams.ratio;
-    compressor.current.attack.value = compParams.attack / 1000; // Convert to seconds
-    compressor.current.release.value = compParams.release / 1000; // Convert to seconds
-  }, [compParams]);
-
-  // Update timer during playback
-  useEffect(() => {
-    const updatePlaybackTime = () => {
-      if (isPlaying && audioContext.current) {
-        setCurrentTime(prev => {
-          const newTime = prev + 0.016; // Approximately 60fps
-          if (newTime >= duration) {
-            if (isLooping) {
-              handleSeek(0);
-              return 0;
-            } else {
-              setIsPlaying(false);
-              return duration;
-            }
-          }
-          return newTime;
-        });
-        playbackTimer.current = requestAnimationFrame(updatePlaybackTime);
-      }
-    };
-
-    if (isPlaying) {
-      playbackTimer.current = requestAnimationFrame(updatePlaybackTime);
-    } else if (playbackTimer.current) {
-      cancelAnimationFrame(playbackTimer.current);
+    if (!compInputGain.current || !compOutputGain.current || !compressor.current) return;
+    
+    compInputGain.current.connect(compOutputGain.current);
+    compInputGain.current.gain.value = compBypassed ? 1 : 0;
+    
+    if (!compBypassed) {
+      compressor.current.threshold.value = compParams.threshold;
+      compressor.current.ratio.value = compParams.ratio;
+      compressor.current.attack.value = compParams.attack / 1000;
+      compressor.current.release.value = compParams.release / 1000;
     }
-
-    return () => {
-      if (playbackTimer.current) {
-        cancelAnimationFrame(playbackTimer.current);
-      }
-    };
-  }, [isPlaying, duration, isLooping]);
+  }, [compBypassed, compParams]);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -173,7 +182,7 @@ const VST = () => {
       audioSource.current.loop = isLooping;
       
       // Connect through the processing chain
-      audioSource.current.connect(lowFilter.current!);
+      audioSource.current.connect(eqInputGain.current!);
       
       audioSource.current.start(0, currentTime);
       setIsPlaying(true);
@@ -187,7 +196,7 @@ const VST = () => {
       audioSource.current = audioContext.current!.createBufferSource();
       audioSource.current.buffer = audioBuffer.current;
       audioSource.current.loop = isLooping;
-      audioSource.current.connect(lowFilter.current!);
+      audioSource.current.connect(eqInputGain.current!);
       audioSource.current.start(0, time);
     }
   };
@@ -293,8 +302,19 @@ const VST = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* EQ Section */}
           <div className="space-y-6">
-            <h2 className="text-xl font-medium">Equalizer</h2>
-            <EQVisualizer parameters={eqParams} />
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-medium">Equalizer</h2>
+              <Toggle 
+                pressed={!eqBypassed} 
+                onPressedChange={(pressed) => setEqBypassed(!pressed)}
+                className={`transition-opacity ${eqBypassed ? 'opacity-50' : ''}`}
+              >
+                {eqBypassed ? <ToggleLeft className="h-4 w-4" /> : <ToggleRight className="h-4 w-4" />}
+                {eqBypassed ? 'Bypassed' : 'Active'}
+              </Toggle>
+            </div>
+            
+            <EQVisualizer parameters={eqParams} disabled={eqBypassed} />
             
             <div className="grid grid-cols-2 gap-6">
               {Object.entries(eqParams).map(([band, value]) => (
@@ -307,7 +327,8 @@ const VST = () => {
                     min={-12}
                     max={12}
                     step={0.1}
-                    className="parameter-change"
+                    className={`parameter-change ${eqBypassed ? 'opacity-50' : ''}`}
+                    disabled={eqBypassed}
                     onValueChange={([v]) => handleEQChange(band as keyof typeof eqParams, v)}
                   />
                   <span className="parameter-value">{value.toFixed(1)} dB</span>
@@ -321,6 +342,9 @@ const VST = () => {
             parameters={compParams}
             onParameterChange={handleCompChange}
             isPlaying={isPlaying}
+            bypassed={compBypassed}
+            onBypassChange={setCompBypassed}
+            analyzerNode={analyzerNode.current}
           />
         </div>
       </Card>

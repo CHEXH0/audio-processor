@@ -7,15 +7,16 @@ interface EQVisualizerProps {
     highMid: number;
     high: number;
   };
+  disabled?: boolean;
 }
 
-const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
+const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, disabled = false }) => {
   const height = 200;
   const width = 400;
 
   const getPointPosition = (index: number, value: number) => {
     const x = (width / 3) * index;
-    const y = height / 2 - (value * height) / 24; // Scale the -12 to +12 range to pixels
+    const y = height / 2 - (value * height) / 24;
     return { x, y };
   };
 
@@ -33,7 +34,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
   };
 
   return (
-    <div className="relative w-full h-[200px] bg-secondary/30 rounded-lg overflow-hidden">
+    <div className={`relative w-full h-[200px] bg-secondary/30 rounded-lg overflow-hidden ${disabled ? 'opacity-50' : ''}`}>
       <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         {/* Grid lines */}
         {[-12, -6, 0, 6, 12].map((db) => {
@@ -81,7 +82,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
               cx={x}
               cy={y}
               r="4"
-              className="fill-primary stroke-background stroke-2 transition-all duration-200 cursor-pointer hover:r-6"
+              className="fill-primary stroke-background stroke-2 transition-all duration-200"
             />
           );
         })}
