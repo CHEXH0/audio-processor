@@ -1,5 +1,6 @@
 import React from 'react';
 import { SlidersHorizontal } from 'lucide-react';
+import { Slider } from "@/components/ui/slider";
 import EQGrid from './eq/EQGrid';
 import FrequencyBands from './eq/FrequencyBands';
 import EQCurve from './eq/EQCurve';
@@ -12,11 +13,16 @@ interface EQVisualizerProps {
     highMid: number;
     high: number;
   };
+  onParameterChange?: (parameter: string, value: number) => void;
 }
 
-const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
+const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters, onParameterChange }) => {
   const width = 600;
   const height = 300;
+
+  const handleSliderChange = (parameter: string) => (value: number[]) => {
+    onParameterChange?.(parameter, value[0]);
+  };
 
   return (
     <div className="space-y-4">
@@ -38,6 +44,49 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
           <EQCurve width={width} height={height} parameters={parameters} />
           <EQControlPoints width={width} height={height} parameters={parameters} />
         </svg>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-4">
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Low (20Hz)</label>
+          <Slider
+            value={[parameters.low]}
+            min={-12}
+            max={12}
+            step={0.1}
+            onValueChange={handleSliderChange('low')}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">Low Mid (200Hz)</label>
+          <Slider
+            value={[parameters.lowMid]}
+            min={-12}
+            max={12}
+            step={0.1}
+            onValueChange={handleSliderChange('lowMid')}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">High Mid (2kHz)</label>
+          <Slider
+            value={[parameters.highMid]}
+            min={-12}
+            max={12}
+            step={0.1}
+            onValueChange={handleSliderChange('highMid')}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium">High (20kHz)</label>
+          <Slider
+            value={[parameters.high]}
+            min={-12}
+            max={12}
+            step={0.1}
+            onValueChange={handleSliderChange('high')}
+          />
+        </div>
       </div>
     </div>
   );
