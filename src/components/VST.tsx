@@ -12,6 +12,7 @@ import { useAudioState } from '@/hooks/useAudioState';
 const VST = () => {
   const { toast } = useToast();
   const playbackTimer = useRef<number | null>(null);
+  const lastPlaybackTime = useRef<number>(0);
   const {
     playbackState: {
       isPlaying,
@@ -55,6 +56,42 @@ const VST = () => {
     });
   }, [eqParams, compParams, eqBypassed, compBypassed]);
 
+  // Handle playback timer
+  useEffect(() => {
+    if (isPlaying) {
+      const startTime = performance.now() - (currentTime * 1000);
+      
+      const updateTimer = () => {
+        const elapsed = (performance.now() - startTime) / 1000;
+        if (elapsed >= duration) {
+          if (isLooping) {
+            setCurrentTime(0);
+            playAudio(0, true);
+          } else {
+            stopAudio();
+            setIsPlaying(false);
+            setCurrentTime(duration);
+          }
+        } else {
+          setCurrentTime(elapsed);
+        }
+        playbackTimer.current = requestAnimationFrame(updateTimer);
+      };
+      
+      playbackTimer.current = requestAnimationFrame(updateTimer);
+    } else if (playbackTimer.current) {
+      cancelAnimationFrame(playbackTimer.current);
+      playbackTimer.current = null;
+    }
+
+    return () => {
+      if (playbackTimer.current) {
+        cancelAnimationFrame(playbackTimer.current);
+        playbackTimer.current = null;
+      }
+    };
+  }, [isPlaying, isLooping, duration]);
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -69,6 +106,7 @@ const VST = () => {
         description: `Loaded: ${file.name}`,
       });
     } catch (error) {
+      console.error('Error loading file:', error);
       toast({
         title: "Error",
         description: "Failed to load audio file",
@@ -77,21 +115,42 @@ const VST = () => {
     }
   };
 
-  const handlePlayPause = () => {
-    if (isPlaying) {
-      stopAudio();
-      setIsPlaying(false);
-    } else {
-      playAudio(currentTime, isLooping);
-      setIsPlaying(true);
+  const handlePlayPause = async () => {
+    try {
+      if (isPlaying) {
+        stopAudio();
+        lastPlaybackTime.current = currentTime;
+        setIsPlaying(false);
+      } else {
+        await playAudio(currentTime, isLooping);
+        setIsPlaying(true);
+      }
+    } catch (error) {
+      console.error('Playback error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to play audio",
+        variant: "destructive",
+      });
     }
   };
 
-  const handleSeek = (time: number) => {
+  const handleSeek = async (time: number) => {
     setCurrentTime(time);
+    lastPlaybackTime.current = time;
     if (isPlaying) {
-      stopAudio();
-      playAudio(time, isLooping);
+      try {
+        stopAudio();
+        await playAudio(time, isLooping);
+      } catch (error) {
+        console.error('Seek error:', error);
+        setIsPlaying(false);
+        toast({
+          title: "Error",
+          description: "Failed to seek audio",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -100,6 +159,7 @@ const VST = () => {
       stopAudio();
     }
     setCurrentTime(0);
+    lastPlaybackTime.current = 0;
     setIsPlaying(false);
   };
 
