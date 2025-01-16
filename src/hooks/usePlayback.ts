@@ -11,6 +11,11 @@ export const usePlayback = (audioContext: AudioContext | null) => {
     }
 
     try {
+      // Ensure context is running
+      if (audioContext.state === 'suspended') {
+        await audioContext.resume();
+      }
+
       console.log('Reading file as array buffer...');
       const arrayBuffer = await file.arrayBuffer();
       

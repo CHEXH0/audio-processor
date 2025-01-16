@@ -4,7 +4,7 @@ export const useAudioContext = () => {
   const audioContext = useRef<AudioContext | null>(null);
   const analyzerNode = useRef<AnalyserNode | null>(null);
 
-  const initializeContext = () => {
+  const initializeContext = async () => {
     console.log('Initializing audio context...');
     try {
       if (!audioContext.current) {
@@ -12,6 +12,11 @@ export const useAudioContext = () => {
           sampleRate: 48000,
           latencyHint: 'interactive'
         });
+      }
+
+      // Ensure context is running
+      if (audioContext.current.state === 'suspended') {
+        await audioContext.current.resume();
       }
 
       if (!analyzerNode.current && audioContext.current) {
@@ -32,6 +37,9 @@ export const useAudioContext = () => {
   };
 
   useEffect(() => {
+    // Initialize context on mount
+    initializeContext().catch(console.error);
+
     return () => {
       if (audioContext.current && audioContext.current.state !== 'closed') {
         console.log('Closing audio context...');

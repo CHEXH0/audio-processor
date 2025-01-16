@@ -30,11 +30,14 @@ export const useEqualizer = (audioContext: AudioContext | null) => {
         eqOutputGain.current.disconnect();
       }
 
+      // Create new nodes
       console.log('Creating EQ input gain...');
       eqInputGain.current = audioContext.createGain();
+      eqInputGain.current.gain.value = 1;
       
       console.log('Creating EQ output gain...');
       eqOutputGain.current = audioContext.createGain();
+      eqOutputGain.current.gain.value = 1;
       
       console.log('Creating low filter...');
       lowFilter.current = audioContext.createBiquadFilter();
