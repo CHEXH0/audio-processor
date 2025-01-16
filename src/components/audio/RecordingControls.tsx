@@ -40,9 +40,9 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
       const destination = audioContext.current.createMediaStreamDestination();
       nodes.compressor?.connect(destination);
       
-      const mimeType = exportFormat === 'wav' ? 'audio/wav' : 'audio/mpeg';
+      // Always record in WebM format, which is widely supported
       mediaRecorder.current = new MediaRecorder(destination.stream, {
-        mimeType: mimeType
+        mimeType: 'audio/webm;codecs=opus'
       });
       
       mediaRecorder.current.ondataavailable = (event) => {
@@ -51,9 +51,28 @@ const RecordingControls: React.FC<RecordingControlsProps> = ({
         }
       };
 
-      mediaRecorder.current.onstop = () => {
-        const blob = new Blob(recordedChunks, { type: mimeType });
-        const url = URL.createObjectURL(blob);
+      mediaRecorder.current.onstop = async () => {
+        const blob = new Blob(recordedChunks, { type: 'audio/webm' });
+        
+        // Convert to selected format before download
+        const audioElement = new Audio();
+        audioElement.src = URL.createObjectURL(blob);
+        
+        const offlineContext = new OfflineAudioContext({
+          numberOfChannels: 2,
+          length: 44100 * audioElement.duration,
+          sampleRate: 44100,
+        });
+        
+        const source = offlineContext.createMediaElementSource(audioElement);
+        source.connect(offlineContext.destination);
+        
+        const renderedBuffer = await offlineContext.startRendering();
+        const finalBlob = new Blob([renderedBuffer], { 
+          type: exportFormat === 'wav' ? 'audio/wav' : 'audio/mpeg' 
+        });
+        
+        const url = URL.createObjectURL(finalBlob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `processed_audio.${exportFormat}`;
