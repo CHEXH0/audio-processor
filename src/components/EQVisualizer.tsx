@@ -33,6 +33,38 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
     return path;
   };
 
+  // Calculate frequency response for visualization
+  const getFrequencyResponse = () => {
+    const frequencies = [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000];
+    return frequencies.map(freq => {
+      let response = 0;
+      
+      // Low shelf contribution
+      if (freq < 320) {
+        response += parameters.low;
+      }
+      
+      // Low-mid peak contribution
+      if (freq > 250 && freq < 2000) {
+        const factor = 1 - Math.abs(Math.log10(freq/1000)) / 2;
+        response += parameters.lowMid * factor;
+      }
+      
+      // High-mid peak contribution
+      if (freq > 1000 && freq < 8000) {
+        const factor = 1 - Math.abs(Math.log10(freq/3200)) / 2;
+        response += parameters.highMid * factor;
+      }
+      
+      // High shelf contribution
+      if (freq > 4000) {
+        response += parameters.high;
+      }
+      
+      return response;
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-2">
@@ -40,7 +72,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
         <h3 className="text-lg font-medium">Equalizer</h3>
       </div>
       
-      <div className="relative w-full h-[200px] glass-panel overflow-hidden">
+      <div className="relative w-full h-[200px] glass-panel overflow-hidden rounded-lg border border-border/50">
         <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
           {/* Grid lines */}
           {[-12, -6, 0, 6, 12].map((db) => {
@@ -89,7 +121,7 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
             );
           })}
 
-          {/* EQ curve with gradient */}
+          {/* Frequency response curve */}
           <defs>
             <linearGradient id="curve-gradient" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stopColor="currentColor" stopOpacity="0.5" />
@@ -113,13 +145,24 @@ const EQVisualizer: React.FC<EQVisualizerProps> = ({ parameters }) => {
           {Object.entries(parameters).map(([band, value], index) => {
             const { x, y } = getPointPosition(index, value);
             return (
-              <circle
-                key={band}
-                cx={x}
-                cy={y}
-                r="4"
-                className="fill-primary stroke-background stroke-2 transition-all duration-200 cursor-pointer hover:r-6"
-              />
+              <g key={band}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r="4"
+                  className="fill-primary stroke-background stroke-2 transition-all duration-200 cursor-pointer hover:r-6"
+                />
+                <text
+                  x={x}
+                  y={y - 12}
+                  fill="currentColor"
+                  fontSize="10"
+                  textAnchor="middle"
+                  className="opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                >
+                  {value.toFixed(1)} dB
+                </text>
+              </g>
             );
           })}
         </svg>

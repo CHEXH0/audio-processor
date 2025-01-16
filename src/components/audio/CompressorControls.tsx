@@ -18,6 +18,13 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
   onParameterChange,
   isPlaying,
 }) => {
+  // Calculate gain reduction based on threshold and ratio
+  const calculateGainReduction = (inputLevel: number) => {
+    if (inputLevel <= parameters.threshold) return 0;
+    const difference = inputLevel - parameters.threshold;
+    return -(difference - difference / parameters.ratio);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-2">
@@ -26,8 +33,11 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
       </div>
       
       <div className="grid grid-cols-2 gap-6">
-        <div className="glass-panel p-4 space-y-2">
-          <label className="parameter-label">Threshold</label>
+        <div className="glass-panel p-4 space-y-2 rounded-lg border border-border/50">
+          <label className="parameter-label flex justify-between">
+            <span>Threshold</span>
+            <span className="text-xs opacity-50">Determines when compression starts</span>
+          </label>
           <Slider
             value={[parameters.threshold]}
             min={-60}
@@ -43,8 +53,11 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
           </div>
         </div>
 
-        <div className="glass-panel p-4 space-y-2">
-          <label className="parameter-label">Ratio</label>
+        <div className="glass-panel p-4 space-y-2 rounded-lg border border-border/50">
+          <label className="parameter-label flex justify-between">
+            <span>Ratio</span>
+            <span className="text-xs opacity-50">Amount of compression applied</span>
+          </label>
           <Slider
             value={[parameters.ratio]}
             min={1}
@@ -60,8 +73,11 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
           </div>
         </div>
 
-        <div className="glass-panel p-4 space-y-2">
-          <label className="parameter-label">Attack</label>
+        <div className="glass-panel p-4 space-y-2 rounded-lg border border-border/50">
+          <label className="parameter-label flex justify-between">
+            <span>Attack</span>
+            <span className="text-xs opacity-50">Speed of compression onset</span>
+          </label>
           <Slider
             value={[parameters.attack]}
             min={0}
@@ -75,8 +91,11 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
           </div>
         </div>
 
-        <div className="glass-panel p-4 space-y-2">
-          <label className="parameter-label">Release</label>
+        <div className="glass-panel p-4 space-y-2 rounded-lg border border-border/50">
+          <label className="parameter-label flex justify-between">
+            <span>Release</span>
+            <span className="text-xs opacity-50">Recovery time after compression</span>
+          </label>
           <Slider
             value={[parameters.release]}
             min={50}
@@ -91,26 +110,27 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
         </div>
       </div>
 
-      {/* VU Meters */}
-      <div className="glass-panel p-4">
+      {/* Compression Visualization */}
+      <div className="glass-panel p-4 rounded-lg border border-border/50">
+        <h3 className="text-sm font-medium mb-2">Gain Reduction Meter</h3>
         <div className="flex justify-between items-end h-32">
-          <div className="flex gap-2">
-            <div className="meter-container">
+          <div className="flex gap-2 w-full">
+            <div className="meter-container flex-1">
               <div 
                 className="meter-bar bg-primary/80 w-full transition-all duration-100"
                 style={{
                   height: `${Math.max(0, Math.min(100, 
-                    isPlaying ? 60 - (parameters.threshold * -1) : 0
+                    isPlaying ? Math.abs(calculateGainReduction(-6)) * 8 : 0
                   ))}%`
                 }}
               />
             </div>
-            <div className="meter-container">
+            <div className="meter-container flex-1">
               <div 
                 className="meter-bar bg-primary/80 w-full transition-all duration-100"
                 style={{
                   height: `${Math.max(0, Math.min(100, 
-                    isPlaying ? 40 - (parameters.threshold * -1) : 0
+                    isPlaying ? Math.abs(calculateGainReduction(-3)) * 8 : 0
                   ))}%`
                 }}
               />
@@ -123,6 +143,26 @@ const CompressorControls: React.FC<CompressorControlsProps> = ({
             <div>-24</div>
           </div>
         </div>
+      </div>
+
+      {/* Compression Curve Visualization */}
+      <div className="glass-panel p-4 rounded-lg border border-border/50">
+        <h3 className="text-sm font-medium mb-2">Compression Curve</h3>
+        <svg width="100%" height="100" viewBox="0 0 100 100" className="stroke-primary fill-none">
+          {/* Grid */}
+          <line x1="0" y1="50" x2="100" y2="50" className="stroke-border opacity-20" />
+          <line x1="50" y1="0" x2="50" y2="100" className="stroke-border opacity-20" />
+          
+          {/* Compression curve */}
+          <path
+            d={`
+              M 0 100
+              L ${50 + parameters.threshold / 1.2} ${50 - parameters.threshold / 1.2}
+              L 100 ${100 - (50 / parameters.ratio)}
+            `}
+            strokeWidth="2"
+          />
+        </svg>
       </div>
     </div>
   );
